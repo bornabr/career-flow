@@ -1,0 +1,11 @@
+# John Doe
+
+## Experience
+
+**Software Engineer** at TechCorp (2022-Present)
+- Developed and maintained web applications using Python and Django.
+- Collaborated with cross-functional teams to deliver high-quality software.
+
+**Intern** at Innovate LLC (2021-2022)
+- Assisted in the development of a new mobile application.
+- Wrote unit tests to ensure code quality.
