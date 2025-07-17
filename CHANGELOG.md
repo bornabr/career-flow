@@ -21,3 +21,11 @@ All notable changes to this project will be documented in this file.
   - Users can paste a job description.
   - Implemented PDF text extraction using `PyMuPDF` to preserve layout.
   - The application displays the extracted resume text for verification.
+
+## [0.2.1] - 2025-07-17
+
+### Added
+- **Stage 2: Ship an Internal Web MVP (In Progress)**
+  - Updated AI prompt to generate a full, structured JSON resume based on the uploaded resume and job description.
+  - Implemented OpenAI's JSON mode for reliable, structured output.
+  - The application now displays the generated JSON for verification.
