@@ -29,3 +29,9 @@ All notable changes to this project will be documented in this file.
   - Updated AI prompt to generate a full, structured JSON resume based on the uploaded resume and job description.
   - Implemented OpenAI's JSON mode for reliable, structured output.
   - The application now displays the generated JSON for verification.
+
+## [0.2.2] - 2025-07-17
+
+### Changed
+- Refactor resume generation logic to use Pydantic models for structured output
+- Add PDF generation functionality using rendercv
