@@ -18,11 +18,11 @@ from code_editor import code_editor
 # Pydantic Models for RenderCV Structure
 # These models define the exact structure RenderCV expects.
 
-MOCK_TEST = True  # Set to True for development/testing with mock data
+MOCK_TEST = False  # Set to True for development/testing with mock data
 
 class SocialNetwork(BaseModel):
     network: str
-    username: str
+    username: str = Field(..., description="Username for the social network (do not add the whole URL)")
 
 class CV(BaseModel):
     name: str
@@ -34,32 +34,41 @@ class CV(BaseModel):
         description="Phone number in E.164 format (e.g., +15555555555)"
     )
     website: Optional[HttpUrl] = None
-    summary: Optional[str] = None
     social_networks: Optional[List[SocialNetwork]] = None
     sections: 'Sections'
 
 class ExperienceEntry(BaseModel):
     company: str
     position: str
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
+    end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
     highlights: List[str]
 
 class EducationEntry(BaseModel):
     institution: str
     area: str
     degree: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
+    end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
 
 class OneLineEntry(BaseModel):
     label: str
     details: str
 
+class PublicationsEntry(BaseModel):
+    title: str
+    authors: List[str]
+    doi: Optional[str] = None
+    journal: str
+    date: Optional[str] = Field(default=None, description="Publication date in YYYY format")
+    url: HttpUrl
+
 class Sections(BaseModel):
-    Experience: List[ExperienceEntry]
-    Education: List[EducationEntry]
+    Summary: List[str]
     Skills: List[OneLineEntry]
+    Education: List[EducationEntry]
+    Experience: List[ExperienceEntry]
+    Publications: List[PublicationsEntry]
 
 # This is required for Pydantic v1/v2 compatibility for forward references.
 CV.model_rebuild()
@@ -76,6 +85,9 @@ The output must be a JSON object that strictly follows the defined schema.
 - Extract all personal information, professional summary, work experiences, education, and skills from the resume.
 - If an information like phone, website, etc was not available don't include it.
 - Focus on tailoring the highlights of the **most recent job experience** to align with the requirements in the job description.
+- For dates use the format YYYY-MM-DD or YYYY-MM or YYYY depending on the context.
+- For social networks username, extract the username instead of using the url. 
+- Use Markdown syntax for bolding important keywords related to job description.
 - Ensure the output is a valid instance of the CV model.
 
 Resume Content:
@@ -92,7 +104,7 @@ Job Description:
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
                 {"role": "user", "content": prompt}
@@ -128,8 +140,18 @@ if resume_file is not None:
     if resume_file.type == "application/pdf":
         try:
             with fitz.open(stream=resume_file.read(), filetype="pdf") as doc:
-                pages = [page.get_text() for page in doc]
-                st.session_state.resume_text = "\n".join(pages)
+                full_content = []
+                for page in doc:
+                    # Extract text from the page
+                    full_content.append(page.get_text())
+                    
+                    # Extract URLs from links on the page
+                    links = page.get_links()
+                    for link in links:
+                        if "uri" in link and link["uri"]:
+                            full_content.append(link["uri"])
+                
+                st.session_state.resume_text = "\n".join(full_content)
         except Exception as e:
             st.error(f"Error reading PDF: {e}")
             st.session_state.resume_text = ""
@@ -172,9 +194,24 @@ if st.button("Generate Tailored Application"):
             generated_cv_content = st.session_state.output
             full_cv_data = {
                 "cv": generated_cv_content,
-                "design": {"theme": "classic"},
-                "rendercv_settings": {
-                    "date": datetime.date.today().strftime('%Y-%m-%d')
+                "design": {
+                    "theme": "engineeringresumes",
+                    "page": {
+                        "top_margin": "1.5cm",
+                        "bottom_margin": "1.5cm",
+                        "left_margin": "1.5cm",
+                        "right_margin": "1.5cm"
+                    },
+                    "text": {
+                        "font_size": "10pt",
+                        "leading": "0.5em"
+                    },
+                    "entries": {
+                        "vertical_space_between_entries": "0.8em"
+                    },
+                    "highlights": {
+                        "vertical_space_between_highlights": "0.2cm"
+                    }
                 },
                 "locale": {
                     "language": "en"

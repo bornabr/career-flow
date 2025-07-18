@@ -41,3 +41,4 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Adding YAML editing
 - Adding PDF preview functionality
+- Refactor Pydantic models for CV structure and enhance PDF resume parsing

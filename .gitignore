@@ -1,1 +1,5 @@
+rendercv_output
+
 .DS_Store
+*.json
+*.pdf
