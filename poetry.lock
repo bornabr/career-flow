@@ -2782,6 +2782,21 @@ watchdog = {version = ">=2.1.5,<7", markers = "platform_system != \"Darwin\""}
 snowflake = ["snowflake-connector-python (>=3.3.0) ; python_version < \"3.12\"", "snowflake-snowpark-python[modin] (>=1.17.0) ; python_version < \"3.12\""]
 
 [[package]]
+name = "streamlit-code-editor"
+version = "0.1.22"
+description = "React-ace editor customized for Streamlit"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "streamlit-code-editor-0.1.22.tar.gz", hash = "sha256:93e6ecb4060614bce99eaf758b4cb5c8ce2accc0eb5140cbbb23c05cb4e9d7f6"},
+    {file = "streamlit_code_editor-0.1.22-py3-none-any.whl", hash = "sha256:31abe12a94abde64123f71049741c248cd52c9de7869decd32a8a5a96695fcf4"},
+]
+
+[package.dependencies]
+streamlit = ">=0.63"
+
+[[package]]
 name = "tenacity"
 version = "9.1.2"
 description = "Retry code until it succeeds"
@@ -3126,4 +3141,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10, <4.0"
-content-hash = "6aca8d904702454130b494f6351d46bd777673fc71e73c2535f1b63642db8c03"
+content-hash = "b19d36ac2cd5d088cdbc07cb093cfba94c92512dc2c35bd37c72ff4954ca07d0"

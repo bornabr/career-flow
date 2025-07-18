@@ -35,3 +35,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Refactor resume generation logic to use Pydantic models for structured output
 - Add PDF generation functionality using rendercv
+
+## [0.2.3] - 2025-07-18
+
+### Changed
+- Adding YAML editing
+- Adding PDF preview functionality

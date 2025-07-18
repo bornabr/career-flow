@@ -12,6 +12,8 @@ import subprocess
 import yaml
 import uuid
 from rendercv.cli.commands import cli_command_render
+import base64
+from code_editor import code_editor
 
 # Pydantic Models for RenderCV Structure
 # These models define the exact structure RenderCV expects.
@@ -114,6 +116,10 @@ if 'output' not in st.session_state:
     st.session_state.output = None
 if 'resume_text' not in st.session_state:
     st.session_state.resume_text = ""
+if 'yaml_for_editing' not in st.session_state:
+    st.session_state.yaml_for_editing = ""
+if 'pdf_bytes' not in st.session_state:
+    st.session_state.pdf_bytes = None
 
 resume_file = st.file_uploader("Upload your resume (txt or pdf)", type=["txt", "pdf"])
 job_description = st.text_area("Paste the job description here")
@@ -139,8 +145,6 @@ if st.button("Generate Tailored Application"):
     if st.session_state.resume_text and job_description:
         if MOCK_TEST:
             with st.spinner("Generating your tailored application... (using mock data)"):
-                # resume_data = get_completion(st.session_state.resume_text, job_description)
-                
                 # For development: Use mock data from the YAML file
                 try:
                     with open('temp_cv_c0bd7810-aa7c-44dc-aa2a-7a00ecc587dd.yaml', 'r') as f:
@@ -163,64 +167,112 @@ if st.button("Generate Tailored Application"):
                 resume_data = get_completion(st.session_state.resume_text, job_description)
                 st.session_state.output = resume_data
         
+        if st.session_state.output:
+            # Construct the full data structure for YAML
+            generated_cv_content = st.session_state.output
+            full_cv_data = {
+                "cv": generated_cv_content,
+                "design": {"theme": "classic"},
+                "rendercv_settings": {
+                    "date": datetime.date.today().strftime('%Y-%m-%d')
+                },
+                "locale": {
+                    "language": "en"
+                }
+            }
+            st.session_state.yaml_for_editing = yaml.dump(full_cv_data, default_flow_style=False, sort_keys=False)
+            st.session_state.pdf_bytes = None # Clear any previously generated PDF
+        else:
+            st.session_state.yaml_for_editing = ""
     else:
         st.error("Please upload a resume and paste a job description.")
 
-if st.session_state.output:
+if st.session_state.yaml_for_editing:
     st.markdown("---")
-    st.subheader("Generated Resume Data (JSON)")
-    st.json(st.session_state.output)
+    st.subheader("Edit Generated Resume Data (YAML)")
+    
+    # Using a key helps Streamlit manage the state of this component better.
+    # The code_editor component returns a dictionary with the edited text and button clicks.
+    response_dict = code_editor(
+        st.session_state.yaml_for_editing,
+        lang="yaml",
+        height=400,
+        key="yaml_editor",
+        buttons=[{
+            "name": "Generate PDF",
+            "feather": "Play",
+            "primary": True,
+            "hasText": True,
+            "showWithIcon": True,
+            "commands": ["submit"],
+            "style": {"bottom": "0.44rem", "right": "0.4rem"}
+        }],
+        response_mode="debounce"
+    )
 
-    # Generate and download PDF using the CLI command function
-    yaml_file_name = None
-    try:
-        generated_cv_content = st.session_state.output
-        full_cv_data = {
-            "cv": generated_cv_content,
-            "design": {"theme": "classic"},
-            "rendercv_settings": {
-                "date": datetime.date.today().strftime('%Y-%m-%d')
-            },
-            "locale": {
-                "language": "en"
-            }
-        }
+    # The component can return an empty text value on certain reruns.
+    # We only update the session state if the returned text is not empty.
+    if response_dict['text'] and response_dict['text'] != st.session_state.yaml_for_editing:
+        st.session_state.yaml_for_editing = response_dict['text']
+        st.session_state.pdf_bytes = None # Clear old PDF on edit
 
-        # 1. Create a temporary YAML file
-        yaml_file_name = f"temp_cv_{uuid.uuid4()}.yaml"
-        with open(yaml_file_name, 'w') as f:
-            yaml.dump(full_cv_data, f, default_flow_style=False, sort_keys=False)
+    # Check if the 'Generate PDF' button was clicked.
+    if response_dict['type'] == "submit":
+        with st.spinner("Generating PDF from edited YAML..."):
+            # Use the most up-to-date YAML from the session state
+            yaml_string = st.session_state.yaml_for_editing
+            if not yaml_string:
+                st.error("Cannot generate PDF from empty YAML. Please ensure there is content in the editor.")
+            else:
+                yaml_file_name = None
+                try:
+                    # 1. Create a temporary YAML file
+                    yaml_file_name = f"temp_cv_{uuid.uuid4()}.yaml"
+                    with open(yaml_file_name, 'w') as f:
+                        f.write(yaml_string)
 
-        output_file_path = "tailored_resume.pdf"
+                    output_file_path = "tailored_resume.pdf"
+                    
+                    # 2. Run RenderCV's render command directly from Python
+                    cli_command_render(
+                        input_file_name=yaml_file_name,
+                        pdf_path=output_file_path,
+                        dont_generate_markdown=True,
+                        dont_generate_html=True,
+                        dont_generate_png=True
+                    )
+
+                    # 3. Check if the file was created and is not empty
+                    if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
+                        with open(output_file_path, "rb") as pdf_file:
+                            st.session_state.pdf_bytes = pdf_file.read()
+                    else:
+                        st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
+                        st.session_state.pdf_bytes = None
+                        if os.path.exists(output_file_path):
+                            st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
+
+                except Exception as e:
+                    st.error(f"An unexpected error occurred during PDF generation: {e}")
+                    st.session_state.pdf_bytes = None
+                finally:
+                    # 4. Clean up the temporary YAML file
+                    if yaml_file_name and os.path.exists(yaml_file_name):
+                        os.remove(yaml_file_name)
+    
+    # Display the PDF if it exists in the session state
+    if st.session_state.pdf_bytes:
+        # Embed PDF viewer
+        base64_pdf = base64.b64encode(st.session_state.pdf_bytes).decode('utf-8')
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="800" height="1000" type="application/pdf"></iframe>'
         
-        # 2. Run RenderCV's render command directly from Python
-        cli_command_render(
-            input_file_name=yaml_file_name,
-            pdf_path=output_file_path,
-            dont_generate_markdown=True,
-            dont_generate_html=True,
-            dont_generate_png=True
+        st.subheader("Tailored Resume Preview")
+        st.markdown(pdf_display, unsafe_allow_html=True)
+
+        # Also provide a download button
+        st.download_button(
+            label="Download Tailored Resume as PDF",
+            data=st.session_state.pdf_bytes,
+            file_name="tailored_resume.pdf",
+            mime="application/pdf"
         )
-
-        # 3. Check if the file was created and is not empty
-        if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
-            with open(output_file_path, "rb") as pdf_file:
-                pdf_bytes = pdf_file.read()
-
-            st.download_button(
-                label="Download Tailored Resume as PDF",
-                data=pdf_bytes,
-                file_name="tailored_resume.pdf",
-                mime="application/pdf"
-            )
-        else:
-            st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
-            if os.path.exists(output_file_path):
-                st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
-
-    except Exception as e:
-        st.error(f"An unexpected error occurred during PDF generation: {e}")
-    finally:
-        # 4. Clean up the temporary YAML file
-        if yaml_file_name and os.path.exists(yaml_file_name):
-            os.remove(yaml_file_name)

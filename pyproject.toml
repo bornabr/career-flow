@@ -13,7 +13,8 @@ dependencies = [
     "rendercv[full] (>=2.2,<3.0)",
     "pyyaml (>=6.0.2,<7.0.0)",
     "pydantic (==2.10.5)",
-    "instructor (>=1.9.2,<2.0.0)"
+    "instructor (>=1.9.2,<2.0.0)",
+    "streamlit-code-editor (>=0.1.22,<0.2.0)"
 ]
 
 
