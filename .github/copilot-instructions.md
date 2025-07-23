@@ -4,15 +4,27 @@
 
 ## Project Overview
 
-Career Flow is a sophisticated, multi-agent AI assistant for job applications. This project follows a multi-stage incremental development roadmap, starting with a simple proof-of-concept and building up to a production-ready system.
+Career Flow is a sophisticated, multi-agent AI assistant for job applications. This project follows a multi-stage incremental development roadmap, starting with a simple proof-of-concept and building up to a production-ready system. The core of the application is a Streamlit frontend that orchestrates resume and job description processing with an AI model, and then generates a tailored PDF resume using RenderCV.
+
+## Core Technologies
+- **Frontend**: Streamlit (`app.py`)
+- **AI/LLM**: OpenAI (via `instructor` for structured output)
+- **Data Validation**: Pydantic models (`app.py`)
+- **PDF Generation**: RenderCV
+- **Dependency Management**: Poetry
 
 ## Critical Workflow Rules - ALWAYS FOLLOW
 
 ### General Development Rules
 1. **Incremental Development**: Always build features incrementally, completing one stage before starting the next
-2. **Use Poetry**: Always use Poetry for package management and dependency handling
+2. **Use Poetry**: Always use Poetry for package management and dependency handling. See `pyproject.toml` for dependencies.
 3. **Avoid Verbose Code**: Always write concise, efficient code - avoid unnecessary complexity
-4. **Enable User Verification**: Always ask the user to verify each stage (or even mid-stage) by providing sanity check instructions and simple tests for them to run
+4. **Enable User Verification**: Always ask the user to verify each stage (or even mid-stage) by providing sanity check instructions and simple tests for them to run.
+
+### Local Development Setup
+1.  **Install Dependencies**: Run `poetry install`.
+2.  **Set API Keys**: Export your OpenAI API key: `export OPENAI_API_KEY='your-key-here'`.
+3.  **Run the App**: Use `streamlit run app.py`.
 
 ### Stage Completion Protocol
 1. **User Verification Required**: Before completing any stage, ALWAYS ask the user to verify the implementation
@@ -32,9 +44,19 @@ Career Flow is a sophisticated, multi-agent AI assistant for job applications. T
 ## Development Guidelines
 
 ### Architecture & Design Principles
+- **Application Flow**: The main application logic is in `app.py`. It follows this sequence:
+    1.  User uploads resume and job description via Streamlit UI.
+    2.  `get_completion` function sends data to OpenAI, using `instructor` to enforce a Pydantic schema (`CV` model).
+    3.  The returned data is converted to a YAML structure compatible with RenderCV.
+    4.  The user can edit the YAML in the UI.
+    5.  On submission, the YAML is used to generate a PDF resume via the `rendercv.cli.commands.cli_command_render` function.
 - Build incrementally: start simple, add complexity gradually
 - Each stage builds upon the previous one
 - Maintain clean, modular code that can be easily extended
+
+### Data Models
+- The Pydantic models in `app.py` (e.g., `CV`, `Sections`, `ExperienceEntry`) are critical. They define the data structure for the entire application, from the AI's output to the YAML for PDF generation.
+- When modifying any resume-related logic, refer to these models first.
 
 ### Package Management & Dependencies
 - **Use Poetry** for all Python package management
@@ -61,7 +83,7 @@ Career Flow is a sophisticated, multi-agent AI assistant for job applications. T
 
 ### Security & Privacy Guidelines
 - Never hardcode API keys or secrets
-- Use environment variables for all sensitive configuration
+- Use environment variables for all sensitive configuration (e.g., `OPENAI_API_KEY`).
 - Follow OpenAI's usage policies and rate limits
 - Implement proper error handling to avoid exposing sensitive data
 - Plan for data encryption in later stages
@@ -76,6 +98,9 @@ Career Flow is a sophisticated, multi-agent AI assistant for job applications. T
 - Maintain clean git history with meaningful commits
 
 ### AI/LLM Integration Best Practices
+- The function `get_completion` in `app.py` is the primary interface with the AI model.
+- The `instructor` library is used with `response_model=CV` to ensure the AI returns structured, Pydantic-validated data.
+- Prompts are defined within `get_completion`. When modifying prompts, be sure to maintain the focus on generating output that conforms to the `CV` Pydantic model.
 - Use OpenAI GPT-4 or GPT-4-mini based on use case requirements
 - Design prompts to be modular and reusable across stages
 - Include comprehensive token usage tracking and cost monitoring
