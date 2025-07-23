@@ -40,16 +40,19 @@ class CV(BaseModel):
 class ExperienceEntry(BaseModel):
     company: str
     position: str
+    location: Optional[str] = None
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
-    end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
-    highlights: List[str]
+    end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM or 'present' format")
+    highlights: List[str] = Field(..., description="List of action-oriented highlights for the role. Quantify achievements where possible. Tailor these to the job description.")
 
 class EducationEntry(BaseModel):
     institution: str
     area: str
     degree: Optional[str] = None
+    location: Optional[str] = None
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
+    highlights: Optional[List[str]] = Field(default=None, description="List of highlights or relevant coursework. Tailor these to the job description. Don't include if not applicable.")
 
 class OneLineEntry(BaseModel):
     label: str
@@ -64,7 +67,7 @@ class PublicationsEntry(BaseModel):
     url: HttpUrl
 
 class Sections(BaseModel):
-    Summary: List[str]
+    Summary: List[str] = Field(..., description="A 2-3 sentence professional summary, tailored to the job description, split into a list of strings.")
     Skills: List[OneLineEntry]
     Education: List[EducationEntry]
     Experience: List[ExperienceEntry]
@@ -79,23 +82,47 @@ def get_completion(resume_content, job_description_content):
     # Patch the client with instructor
     client = instructor.patch(OpenAI(api_key=os.environ.get("OPENAI_API_KEY")))
 
-    prompt = f"""You are an expert career coach AI. Your task is to parse a resume and a job description, then generate a complete, tailored resume.
-The output must be a JSON object that strictly follows the defined schema.
+    prompt = f"""
+**Role**: You are a world-class professional resume writer and career coach AI. Your mission is to transform a generic resume into a highly tailored, compelling CV that is optimized for a specific job description.
 
-- Extract all personal information, professional summary, work experiences, education, and skills from the resume.
-- If an information like phone, website, etc was not available don't include it.
-- Focus on tailoring the highlights of the **most recent job experience** to align with the requirements in the job description.
-- For dates use the format YYYY-MM-DD or YYYY-MM or YYYY depending on the context.
-- For social networks username, extract the username instead of using the url. 
-- Use Markdown syntax for bolding important keywords related to job description.
-- Ensure the output is a valid instance of the CV model.
+**Task**: Generate a complete, tailored resume as a JSON object that strictly adheres to the provided Pydantic and rendercv (v2) schema.
 
-Resume Content:
+**Rules & Guidelines**:
+1.  **Strict Schema Adherence**: The final output MUST be a single, valid JSON object conforming to the `CV` model. No extra fields or deviations.
+2.  **No Hallucination**: Do NOT invent information. If a piece of information (e.g., website, a specific skill, a full date) is not present in the resume, omit the field entirely from the output.
+3.  **Professional Tone**: Use action-oriented language (e.g., "Led," "Architected," "Implemented," "Accelerated").
+4.  **Date Formatting**: Adhere strictly to the date formats specified in the schema descriptions (YYYY-MM, YYYY, or 'present').
+5.  **Username Extraction**: For social networks like LinkedIn or GitHub, extract only the username, not the full URL.
+6.  **Keyword Bolding**: Use Markdown (`**keyword**`) to bold keywords in the `highlights` and `Summary` that directly match skills or responsibilities mentioned in the job description.
+
+**Step-by-Step Process**:
+
+**Step 1: Analyze Job Description & Resume**
+-   Thoroughly analyze the provided `Job Description` to identify the top 5-7 most critical keywords, skills, and qualifications.
+-   Scan the `Resume Content` to extract all available personal details, summary, experience, education, and skills.
+
+**Step 2: Synthesize and Tailor the CV Content**
+-   **Summary**: Write a powerful, concise 2-3 sentence summary (at most 3 lines). This summary must be a sharp, targeted pitch that mirrors the key requirements from the job description, using the candidate's experience as evidence.
+-   **Experience Highlights**:
+    -   For the **most recent** job experiences, rewrite the highlights to be impactful and action-oriented.
+    -   Directly integrate the keywords identified in Step 1.
+    -   Quantify achievements with metrics where possible (e.g., "Increased efficiency by 30%," "Managed a team of 5").
+    -   For older roles, keep the descriptions concise and relevant.
+-   **Skills**:
+    -   Filter the skills from the resume to feature only those relevant to the job description.
+    -   Group related skills under appropriate labels (e.g., `label: "Programming Languages"`, `details: "Python, Java, C++"`).
+    -   Add job description keywords as new skills if they are not already present in the resume but bring them in red colored text so that they can be easily identified for the user to review.
+-   **Education**: Include relevant education entries, focusing on degrees and institutions that align with the job requirements. Filter courses to include only those that are relevant to the position.
+
+**Step 3: Generate Final JSON Output**
+-   Assemble the tailored content into a single JSON object that perfectly matches the `CV` Pydantic model.
+
+**Resume Content**:
 ---
 {resume_content}
 ---
 
-Job Description:
+**Job Description**:
 ---
 {job_description_content}
 ---
@@ -104,7 +131,7 @@ Job Description:
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="o3",
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
                 {"role": "user", "content": prompt}
