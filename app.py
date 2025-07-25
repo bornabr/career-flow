@@ -259,8 +259,12 @@ if st.button("Generate Tailored Application"):
                         "font_size": "10pt",
                         "leading": "0.5em"
                     },
+                    "header": {
+                        "horizontal_space_between_connections": "0.2cm",
+                    },
                     "entries": {
-                        "vertical_space_between_entries": "0.8em"
+                        "vertical_space_between_entries": "0.8em",
+                        "date_and_location_width": "3.5cm"
                     },
                     "highlights": {
                         "vertical_space_between_highlights": "0.2cm"
