@@ -1,32 +1,21 @@
-[project]
+[tool.poetry]
 name = "career-flow"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Borna Barahimi",email = "bornabarahimi@gmail.com"}
-]
+authors = ["Borna Barahimi <bornabarahimi@gmail.com>"]
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "openai (>=1.96.1,<2.0.0)",
-    "streamlit (>=1.46.1,<2.0.0)",
-    "rendercv[full] (>=2.2,<3.0)",
-    "pyyaml (>=6.0.2,<7.0.0)",
-    "pydantic (==2.10.5)",
-    "instructor (>=1.9.2,<2.0.0)",
-    "streamlit-code-editor (>=0.1.22,<0.2.0)"
-]
-
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
+packages = [{include = "career_flow"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10, <4.0"
 openai = ">=1.96.1,<2.0.0"
 streamlit = ">=1.46.1,<2.0.0"
-rendercv = ">=2.2,<3.0"
+"rendercv" = {extras = ["full"], version = ">=2.2,<3.0"}
 pyyaml = ">=6.0.2,<7.0.0"
 pydantic = "==2.10.5"
+instructor = ">=1.9.2,<2.0.0"
+streamlit-code-editor = ">=0.1.22,<0.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

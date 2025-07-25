@@ -3,3 +3,8 @@ rendercv_output
 .DS_Store
 *.json
 *.pdf
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
