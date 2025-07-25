@@ -14,6 +14,7 @@ import uuid
 from rendercv.cli.commands import cli_command_render
 import base64
 from code_editor import code_editor
+from streamlit_local_storage import LocalStorage
 
 # Pydantic Models for RenderCV Structure
 # These models define the exact structure RenderCV expects.
@@ -78,9 +79,9 @@ CV.model_rebuild()
 Sections.model_rebuild()
 
 
-def get_completion(resume_content, job_description_content):
+def get_completion(resume_content, job_description_content, api_key):
     # Patch the client with instructor
-    client = instructor.patch(OpenAI(api_key=os.environ.get("OPENAI_API_KEY")))
+    client = instructor.patch(OpenAI(api_key=api_key))
 
     prompt = f"""
 **Role**: You are a world-class professional resume writer and career coach AI. Your mission is to transform a generic resume into a highly tailored, compelling CV that is optimized for a specific job description.
@@ -94,6 +95,7 @@ def get_completion(resume_content, job_description_content):
 4.  **Date Formatting**: Adhere strictly to the date formats specified in the schema descriptions (YYYY-MM, YYYY, or 'present').
 5.  **Username Extraction**: For social networks like LinkedIn or GitHub, extract only the username, not the full URL.
 6.  **Keyword Bolding**: Use Markdown (`**keyword**`) to bold keywords in the `highlights` and `Summary` that directly match skills or responsibilities mentioned in the job description.
+7.  **Bullet Points**: Use a list format for `highlights` in `Experience` and `Education` sections. Each highlight should be a single, concise sentence. Use the line width efficiently by writing sentences that use the full width of the line (or lines), but do not exceed 2 lines in total for any single highlight.
 
 **Step-by-Step Process**:
 
@@ -107,11 +109,11 @@ def get_completion(resume_content, job_description_content):
     -   For the **most recent** job experiences, rewrite the highlights to be impactful and action-oriented.
     -   Directly integrate the keywords identified in Step 1.
     -   Quantify achievements with metrics where possible (e.g., "Increased efficiency by 30%," "Managed a team of 5").
-    -   For older roles, keep the descriptions concise and relevant.
+    -   For older roles, remove those that don't have relevant highlights or are not directly applicable to the job description. For those that you keep, keep their highlights concise and relevant.
 -   **Skills**:
     -   Filter the skills from the resume to feature only those relevant to the job description.
     -   Group related skills under appropriate labels (e.g., `label: "Programming Languages"`, `details: "Python, Java, C++"`).
-    -   Add job description keywords as new skills if they are not already present in the resume but bring them in red colored text so that they can be easily identified for the user to review.
+    -   Add job description keywords as new skills if they are not already present in the resume but bring them in **bold** text so that they can be easily identified for the user to review.
 -   **Education**: Include relevant education entries, focusing on degrees and institutions that align with the job requirements. Filter courses to include only those that are relevant to the position.
 
 **Step 3: Generate Final JSON Output**
@@ -131,7 +133,7 @@ def get_completion(resume_content, job_description_content):
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
-            model="o3",
+            model="gpt-4.1",
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
                 {"role": "user", "content": prompt}
@@ -150,6 +152,28 @@ def get_completion(resume_content, job_description_content):
         return None
 
 st.title("Career Flow - AI Job Application Assistant")
+
+localS = LocalStorage()
+
+# Function to get and set API key in local storage
+def get_api_key():
+    return localS.getItem("api_key")
+
+def set_api_key(key):
+    localS.setItem("api_key", key)
+
+# Get the API key from local storage
+stored_api_key = get_api_key()
+api_key = st.text_input(
+    "Enter your OpenAI API Key", 
+    type="password", 
+    help="Your API key is stored securely in your browser's local storage.",
+    value=stored_api_key if stored_api_key else ""
+)
+
+# If the user enters a new key, update it in local storage
+if api_key and (api_key != stored_api_key):
+    set_api_key(api_key)
 
 if 'output' not in st.session_state:
     st.session_state.output = None
@@ -191,7 +215,9 @@ if resume_file is not None:
 
 
 if st.button("Generate Tailored Application"):
-    if st.session_state.resume_text and job_description:
+    if not api_key:
+        st.error("Please enter your OpenAI API key to proceed.")
+    elif st.session_state.resume_text and job_description:
         if MOCK_TEST:
             with st.spinner("Generating your tailored application... (using mock data)"):
                 # For development: Use mock data from the YAML file
@@ -213,7 +239,7 @@ if st.button("Generate Tailored Application"):
                 st.session_state.output = resume_data
         else:
             with st.spinner("Generating your tailored application..."):
-                resume_data = get_completion(st.session_state.resume_text, job_description)
+                resume_data = get_completion(st.session_state.resume_text, job_description, api_key)
                 st.session_state.output = resume_data
         
         if st.session_state.output:
