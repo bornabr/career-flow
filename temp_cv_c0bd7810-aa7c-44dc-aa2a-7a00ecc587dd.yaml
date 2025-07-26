@@ -3,106 +3,131 @@ cv:
   location: Toronto, ON
   email: bornabarahimi@gmail.com
   phone: '+13652751314'
-  website: null
-  summary: ML Engineer with a strong full-stack background and 4+ years of experience
-    building and deploying scalable, data-driven applications. Proficient in Python,
-    React, and Docker, with hands-on experience in MLOps workflows and integrating
-    models on edge hardware like Raspberry Pi.
+  website: https://bornabr.github.io/
   social_networks:
   - network: LinkedIn
-    username: BornaBarahimi
+    username: borna-barahimi
   - network: GitHub
-    username: BornaBarahimi
-  - network: Google Scholar
-    username: BornaBarahimi
+    username: bornabr
   sections:
-    Experience:
-    - company: Cognitive Systems Corp.
-      position: ML Engineer / Data Scientist
-      start_date: 2024-08
-      end_date: null
-      highlights:
-      - Appling advanced statistical machine learning techniques (HMMs, clustering,
-        decision trees) to analyze motion time-series data for a HealthTech caregiving
-        solution.
-      - Packaged ML models into reusable, scalable software libraries and components
-        for product integration.
-      - Created prototype dashboards using Plotly by Dash and Bokeh, enhancing proof-of-concept
-        presentation.
-      - Focused on developing and maintaining backend systems using Python for scalable
-        solutions.
-    - company: Vector Institute
-      position: Research Associate
-      start_date: 2025-02
-      end_date: null
-      highlights:
-      - Building multi-modal foundation models for Brain-Computer Interface (BCI)
-        using EEG and fMRI data.
-      - Fine-tuned transformer models using self-supervised learning for modality
-        alignment in distributed multi-GPU and multi-node settings.
-    - company: York University
-      position: Research Assistant
-      start_date: 2022-09
-      end_date: 2024-08
-      highlights:
-      - Published a journal and 2 conference papers in top IEEE ComSoc venues and
-        NeurIPS 2024.
-      - Designed a human activity recognition (HAR) framework for time-series WiFi
-        data using self-supervised learning, with Pytorch Lightning, improving SOTA
-        accuracy by 6% and supervised methods by 30%.
-      - Developed a joint HAR classification and compression with dilated CNN, LSTM
-        and autoencoder for cloud-based sensing, optimizing edge computation by 99%.
-      - Mentored 3 undergrad students resulting in creation of a dataset for WiFi
-        sensing using Raspberry Pi.
-    - company: VClinic
-      position: Full-stack Developer
-      start_date: 2019-07
-      end_date: 2021-07
-      highlights:
-      - Developed RESTful APIs for core functionalities including scheduling, EHR,
-        and electronic prescriptions.
-      - Automated application deployment and improved system reliability by creating
-        CI/CD pipelines to deploy microservices using Docker and enable cloud integrations
-        using RabbitMQ.
-      - Managed and integrated MongoDB, PostgreSQL, and Redis databases to support
-        the distributed system.
+    Summary:
+    - Passionate **Machine Learning Engineer** with over 2 years of experience in
+      developing and deploying **machine learning models** and **optimization algorithms**
+      for large-scale production environments. Excels in creating **end-to-end ML
+      solutions** for real-time applications while collaborating with cross-functional
+      teams to solve complex business challenges.
+    Skills:
+    - label: Programming Languages
+      details: Python, C++, MATLAB, R, JavaScript, SQL, Bash
+    - label: ML Frameworks
+      details: Pytorch (Lightning), TensorFlow, Keras
+    - label: Data Science Libraries
+      details: NumPy, Pandas, SciPy, Scikit-learn, Matplotlib, Seaborn, Streamlit,
+        Plotly, Bokeh
+    - label: Distributed Computing
+      details: SLURM, Multi-GPU Training
+    - label: ML Algorithms
+      details: XGBoost, Linear Regression, Decision Trees, Clustering, Reinforcement
+        Learning, Causal Modeling
+    - label: Databases
+      details: PostgreSQL, MongoDB, NoSQL
+    - label: Cloud & MLOps
+      details: GCP (Compute Engine, BigQuery, Vertex AI), AWS (EC2, S3, SageMaker),
+        Azure
+    - label: Soft Skills
+      details: Problem Solving, Communication, Team Collaboration, Critical Thinking,
+        Leadership
     Education:
-    - institution: York University, Canada
+    - institution: York University
       area: Computer Science
       degree: M.Sc.
+      location: null
       start_date: 2022-09
       end_date: 2024-08
+      highlights:
+      - 'GPA: A+'
+      - Best Thesis Award of York University
+      - 'Thesis: Robust Representation Learning Solutions for Wireless Sensing Applications'
     - institution: University of Tehran
       area: Computer Science
       degree: B.Sc.
+      location: null
       start_date: 2018-09
       end_date: 2022-06
-    Skills:
-    - label: Programming Languages
-      details: Python, JavaScript, SQL, Bash
-    - label: Web Frameworks
-      details: Node.js, ExpressJS, Restful APIs, React
-    - label: ML Frameworks
-      details: Pytorch (Lightning), TensorFlow, Keras
-    - label: Data Science Libs
-      details: NumPy, Pandas, SciPy, Scikit-learn
-    - label: Distributed Computing
-      details: SLURM, Multi-GPU Training
-    - label: DL Models
-      details: Transformers/ViT, CNN, RNN/LSTM, Autoencoders
-    - label: Databases
-      details: PostgreSQL, MongoDB, NoSQL
-    - label: DevOps
-      details: Docker, Kubernetes, CI/CD, TeamCity
-    - label: Cloud & MLOps
-      details: GCP (Compute Engine, BigQuery, Vertex AI), AWS (EC2, S3, SageMaker,
-        Bedrock, Q), Azure
-    - label: Productivity
-      details: Git, Git Workflows, Confluence, Notion, Prompt Engineering, Github
-        Copilot
+      highlights: null
+    Experience:
+    - company: Cognitive Systems Corp.
+      position: ML Engineer / Data Scientist
+      location: Waterloo, Ontario, Canada
+      start_date: 2024-08
+      end_date: present
+      highlights:
+      - Contributed to the development of WiFi Motion for Caregiving, a non-intrusive
+        healthcare monitoring solution for **real-time activity detection** in aging-in-place
+        applications.
+      - Applied statistical machine learning techniques to analyze **time-series data**,
+        including **Hidden Markov Models (HMM)**, clustering, decision trees, and
+        dimensionality reduction methods.
+      - Packaged ML models into reusable, scalable software libraries for product
+        integration.
+    - company: Vector Institute
+      position: Research Associate
+      location: Toronto, Ontario, Canada
+      start_date: 2025-02
+      end_date: present
+      highlights:
+      - Building **multi-modal foundation models** for Brain-Computer Interfaces (BCI)
+        using EEG and fMRI data.
+      - Fine-tuned transformer models using **self-supervised learning** for modality
+        alignment in distributed settings.
+    - company: York University
+      position: Research Assistant
+      location: Toronto, Ontario, Canada
+      start_date: 2022-09
+      end_date: 2024-08
+      highlights:
+      - Published journal and conference papers in top IEEE ComSoc venues and NeurIPS.
+      - Designed a human activity recognition (HAR) framework for time-series WiFi
+        data using **self-supervised learning**, improving SOTA accuracy by **6%**.
+    - company: VClinic
+      position: Full-stack Developer
+      location: ''
+      start_date: 2019-07
+      end_date: 2021-07
+      highlights:
+      - Enhanced platform performance by migrating a legacy healthcare system to a
+        scalable microservices architecture using Node.js and React.
+      - Developed **RESTful APIs** for core functionalities and automated application
+        deployment using **CI/CD pipelines**.
+    Publications:
+    - title: 'Context-Aware Predictive Coding: A Representation Learning Framework
+        for WiFi Sensing'
+      authors:
+      - Borna Barahimi
+      doi: null
+      journal: IEEE OJ-COMS
+      date: null
+      url: https://ieeexplore.ieee.org/document/10684811
+    - title: 'RSCNet: Dynamic CSI Compression for Cloud-Based WiFi Sensing'
+      authors:
+      - Borna Barahimi
+      doi: null
+      journal: IEEE ICC 2024
+      date: null
+      url: https://arxiv.org/abs/2402.04888
 design:
-  theme: classic
-rendercv_settings:
-  date: '2025-07-17'
+  theme: engineeringresumes
+  page:
+    top_margin: 1.5cm
+    bottom_margin: 1.5cm
+    left_margin: 1.5cm
+    right_margin: 1.5cm
+  text:
+    font_size: 10pt
+    leading: 0.5em
+  entries:
+    vertical_space_between_entries: 0.8em
+  highlights:
+    vertical_space_between_highlights: 0.2cm
 locale:
   language: en
