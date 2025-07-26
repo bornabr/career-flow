@@ -2833,6 +2833,24 @@ streamlit = ">=0.63"
 devel = ["playwright (==1.36.0)", "pytest (==7.4.0)", "pytest-playwright-snapshot (==1.0)", "pytest-rerunfailures (==12.0)", "requests (==2.31.0)", "wheel"]
 
 [[package]]
+name = "streamlit-pdf-viewer"
+version = "0.0.26"
+description = "Streamlit component for PDF visualisation and manipulation"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "streamlit_pdf_viewer-0.0.26-py3-none-any.whl", hash = "sha256:d6fcc9b1bb0d79e07d3c3506b5467bf79b9c3aada15ffa052e9bf3b913df33aa"},
+    {file = "streamlit_pdf_viewer-0.0.26.tar.gz", hash = "sha256:360560b04b01f4805dccbece16e649077e2983a753102c4c95338d8c5234a7d2"},
+]
+
+[package.dependencies]
+streamlit = ">=0.63"
+
+[package.extras]
+devel = ["wheel"]
+
+[[package]]
 name = "tenacity"
 version = "9.1.2"
 description = "Retry code until it succeeds"
@@ -3177,4 +3195,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10, <4.0"
-content-hash = "73a523063267c9572951fee14240a56ae9f79b7bc8b2ea3d2084d4274db8da07"
+content-hash = "e538368fbdf562211a9cf2367c5310f58526ae1995b2b4b1f1fff3d4be34be33"

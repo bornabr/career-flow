@@ -15,6 +15,7 @@ from rendercv.cli.commands import cli_command_render
 import base64
 from code_editor import code_editor
 from streamlit_local_storage import LocalStorage
+from streamlit_pdf_viewer import pdf_viewer
 
 # Pydantic Models for RenderCV Structure
 # These models define the exact structure RenderCV expects.
@@ -255,7 +256,8 @@ if st.button("Generate Tailored Application"):
                         "top_margin": "1cm",
                         "bottom_margin": "1cm",
                         "left_margin": "1cm",
-                        "right_margin": "1cm"
+                        "right_margin": "1cm",
+                        "show_last_updated_date": False
                     },
                     "text": {
                         "font_size": "10pt",
@@ -358,14 +360,8 @@ if st.session_state.yaml_for_editing:
     
     # Display the PDF if it exists in the session state
     if st.session_state.pdf_bytes:
-        # Embed PDF viewer
-        base64_pdf = base64.b64encode(st.session_state.pdf_bytes).decode('utf-8')
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="800" height="1000" type="application/pdf"></iframe>'
-        
         st.subheader("Tailored Resume Preview")
-        st.markdown(pdf_display, unsafe_allow_html=True)
-
-        # Also provide a download button
+        pdf_viewer(st.session_state.pdf_bytes, width="100%", height=1000)
         st.download_button(
             label="Download Tailored Resume as PDF",
             data=st.session_state.pdf_bytes,
