@@ -30,7 +30,7 @@ class CV(BaseModel):
     name: str
     location: str
     email: Optional[str] = None
-    phone: str = Field(
+    phone: Optional[str] = Field(
         ..., 
         pattern=r"^\+?[1-9]\d{1,14}$",
         description="Phone number in E.164 format (e.g., +15555555555)"
