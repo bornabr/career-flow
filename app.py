@@ -133,6 +133,7 @@ def get_completion(resume_content, job_description_content, api_key):
 
     prompt = _build_prompt(resume_content, job_description_content)
     
+
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
@@ -145,13 +146,51 @@ def get_completion(resume_content, job_description_content, api_key):
         )
         # The response is already a Pydantic object, so we convert it to a dict
         return cv_instance.model_dump()
-        
     except ValidationError as e:
         st.error("AI response did not match the required data structure:")
         st.error(e)
         return None
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
+        return None
+
+# Cover Letter Generation Function
+def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) -> str:
+    """
+    Generate a tailored cover letter using OpenAI, given the YAML resume and job description.
+    Returns the cover letter text or None on error.
+    """
+    client = OpenAI(api_key=api_key)
+    prompt = f"""
+You are a world-class professional resume writer and career-coach AI. Your mission is to write a compelling, tailored cover letter for a job application.
+
+**Instructions:**
+1. Use the provided resume data (YAML format) and job description to craft a cover letter.
+2. The cover letter should be highly relevant, concise (max 350 words), and highlight the candidate's fit for the role.
+3. Use a professional, engaging tone. Do not hallucinate details not present in the resume.
+4. Address the letter to the appropriate role/company if possible (extract from job description).
+5. Output only the cover letter text, no formatting or extra commentary.
+
+---
+**Resume YAML:**
+{yaml_resume}
+---
+**Job Description:**
+{job_description}
+---
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {"role": "system", "content": "You are a career-coach AI that writes tailored cover letters."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        # Extract the cover letter text from the response
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        st.error(f"An error occurred while generating the cover letter: {e}")
         return None
 
 st.title("Career Flow - AI Job Application Assistant")
@@ -368,3 +407,26 @@ if st.session_state.yaml_for_editing:
             file_name="tailored_resume.pdf",
             mime="application/pdf"
         )
+
+    # --- Cover Letter Generation Section ---
+    st.markdown("---")
+    st.subheader("Generate Tailored Cover Letter")
+    if 'cover_letter' not in st.session_state:
+        st.session_state.cover_letter = ""
+
+    if st.button("Generate Cover Letter"):
+        if not api_key:
+            st.error("Please enter your OpenAI API key to proceed.")
+        elif not st.session_state.yaml_for_editing or not job_description:
+            st.error("YAML resume and job description are required to generate a cover letter.")
+        else:
+            with st.spinner("Generating your tailored cover letter..."):
+                cover_letter = generate_cover_letter(st.session_state.yaml_for_editing, job_description, api_key)
+                if cover_letter:
+                    st.session_state.cover_letter = cover_letter
+                else:
+                    st.session_state.cover_letter = ""
+
+    if st.session_state.cover_letter:
+        st.markdown("**Your Tailored Cover Letter:**")
+        st.text_area("Cover Letter", value=st.session_state.cover_letter, height=300)
