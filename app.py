@@ -56,9 +56,17 @@ class EducationEntry(BaseModel):
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
     highlights: Optional[List[str]] = Field(default=None, description="List of highlights or relevant coursework. Tailor these to the job description. Don't include if not applicable.")
 
+
 class OneLineEntry(BaseModel):
     label: str
     details: str
+
+# Personal Project Entry Model
+class PersonalProjectEntry(BaseModel):
+    name: str
+    description: str = Field(..., description="Brief description of the project, including technologies used and impact.")
+    url: Optional[HttpUrl] = Field(default=None, description="Link to the project (GitHub, website, etc.)")
+    highlights: Optional[List[str]] = Field(default=None, description="Key achievements or features. Tailor these to the job description.")
 
 class PublicationsEntry(BaseModel):
     title: str
@@ -74,6 +82,7 @@ class Sections(BaseModel):
     Education: List[EducationEntry]
     Experience: List[ExperienceEntry]
     Publications: List[PublicationsEntry]
+    PersonalProjects: Optional[List[PersonalProjectEntry]] = Field(default=None, description="List of personal projects relevant to the job. Each entry should highlight technologies, impact, and relevance.")
 
 # This is required for Pydantic v1/v2 compatibility for forward references.
 CV.model_rebuild()
@@ -98,24 +107,26 @@ def _build_prompt(resume: str, job_desc: str) -> str:
 **Non-Negotiable Constraints**
 1. **Schema Fidelity** - Output **must** be valid JSON matching the `CV` model (no extra keys).
 2. **No Hallucination** - Omit any detail not present in the resume. If a field is missing, leave it out.
-3. **Relevancy Filter** - Include *only* experience, skills, and education that directly or indirectly support the job description. Drop the rest.
+3. **Relevancy Filter** - Include *only* experience, skills, education, and personal projects that directly or indirectly support the job description. Drop the rest.
 4. **Highlights Hygiene** -
    - Split overly long or compound highlights into concise bullets (≤2 lines each).
-   - Each Experience can have upto 4 highlights for recent roles and 3 for older roles.
+   - Each Experience can have up to 4 highlights for recent roles and 3 for older roles.
+   - Each Personal Project can have up to 3 highlights, focused on technologies, impact, and relevance to the job.
 5. **Action Verbs & Metrics** - Start bullets with strong verbs (e.g., "Led", "Architected") and quantify impact when possible (e.g., "Increased efficiency by 30%," "Managed a team of 5"). 
-6. **Markdown Emphasis** - Bold (`**`) any keyword that *exactly* matches a skill or responsibility from the job description (in `highlights` & `summary`).
+6. **Markdown Emphasis** - Bold (`**`) any keyword that *exactly* matches a skill or responsibility from the job description (in `highlights`, `summary`, and `personal projects`).
 7. **Date Format** - Use YYYY-MM, YYYY, or "present" exactly as defined in the schema.
 8. **Username Extraction** - Return only usernames for social links (e.g., GitHub, LinkedIn).
 9. **Single-Page Target** - Keep the final CV to about **one page** (≈500-600 words when rendered). Trim or omit less critical details to fit including old experiences, non-relevant skills, and other extraneous information.
 
 ---
 **Step-by-Step Process (internal - do not output)**
-1. **Analyse Inputs** - Identify the 5-7 most critical keywords/skills from the Job Description that are strongly relavant to the user's background. Map resume content to those.
+1. **Analyse Inputs** - Identify the 5-7 most critical keywords/skills from the Job Description that are strongly relevant to the user's background. Map resume content to those.
 2. **Synthesise Content** -
    - **Summary** - 2-3 sentences (≤3 lines totally) that pitch the candidate using those keywords.
    - **Experience** - Rewrite recent roles; keep or remove older ones based on relevance. Ensure highlights follow Constraint 4 and overall length supports the single-page goal.
    - **Skills** - Present only relevant skills, grouped under clear labels. Add missing JD keywords (**bolded**) if absent in resume but seems suitable.
    - **Education** - Generally does not need any highlights. Only include entries when they directly strengthen candidacy for the role.
+   - **Personal Projects** - Include personal projects that demonstrate relevant skills, technologies, or impact. Focus on those most relevant to the job description. Personal projects is an optional section, so if no relevant projects exist, this section can be omitted.
 3. **Assemble JSON** - Populate the `CV` object and return *only* the JSON.
 
 ---
@@ -137,7 +148,7 @@ def get_completion(resume_content, job_description_content, api_key):
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
-            model="gpt-4.1",
+            model="o3",
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
                 {"role": "user", "content": prompt}
@@ -181,7 +192,7 @@ You are a world-class professional resume writer and career-coach AI. Your missi
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1",
+            model="o3",
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that writes tailored cover letters."},
                 {"role": "user", "content": prompt}
