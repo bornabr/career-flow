@@ -1,11 +1,8 @@
-# Import os first so it is available for is_deployed()
 import os
-# Utility function to detect local vs deployed environment
-def is_deployed():
-    # Set ENV=production in deployed environment
-    return os.environ.get("ENV", "local").lower() == "production"
-
-print("Running in deployed environment:", is_deployed())
+from dotenv import load_dotenv
+load_dotenv()
+MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-4o")
+print(f"Using OpenAI model: {MODEL_NAME}")
 
 import streamlit as st
 from openai import OpenAI
@@ -151,12 +148,10 @@ def get_completion(resume_content, job_description_content, api_key):
     client = instructor.patch(OpenAI(api_key=api_key))
 
     prompt = _build_prompt(resume_content, job_description_content)
-    model_name = "gpt-4o" if is_deployed() else "o3"
-
     try:
         # Use the response_model parameter to get structured output
         cv_instance = client.chat.completions.create(
-            model=model_name,
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
                 {"role": "user", "content": prompt}
@@ -180,7 +175,6 @@ def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) 
     Returns the cover letter text or None on error.
     """
     client = OpenAI(api_key=api_key)
-    model_name = "gpt-4o" if is_deployed() else "o3"
     prompt = f"""
 You are a world-class professional resume writer and career-coach AI. Your mission is to write a compelling, tailored cover letter for a job application.
 
@@ -201,7 +195,7 @@ You are a world-class professional resume writer and career-coach AI. Your missi
 """
     try:
         response = client.chat.completions.create(
-            model=model_name,
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": "You are a career-coach AI that writes tailored cover letters."},
                 {"role": "user", "content": prompt}
