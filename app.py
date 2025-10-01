@@ -1,3 +1,59 @@
+# Recursively clean all string values in a dict/list for ATS-friendliness
+def ats_clean_data(data):
+    issues = []
+    def _clean(val):
+        if isinstance(val, str):
+            cleaned, found = ats_friendly_text(val)
+            issues.extend(found)
+            return cleaned
+        elif isinstance(val, list):
+            return [_clean(v) for v in val]
+        elif isinstance(val, dict):
+            return {k: _clean(v) for k, v in val.items()}
+        else:
+            return val
+    cleaned_data = _clean(data)
+    return cleaned_data, list(set(issues))
+# --- ATS Friendliness Audit ---
+import unicodedata
+import re
+
+def ats_friendly_text(text: str):
+    """
+    Replace non-ASCII characters with ASCII equivalents and flag problematic ones for ATS friendliness.
+    Returns (cleaned_text, issues_list)
+    """
+    # Map of common non-ASCII to ASCII replacements
+    replacements = {
+        '“': '"', '”': '"', '‘': "'", '’': "'",
+        '–': '-', '—': '-', '−': '-', '•': '-',
+        '…': '...', '´': "'", '•': '-',
+        '→': '->', '←': '<-', '⇒': '=>', '≠': '!=',
+        '®': '', '©': '', '™': '',
+        '\u00a0': ' ', # non-breaking space
+    }
+    issues = []
+    def replace_char(c):
+        if c in replacements:
+            return replacements[c]
+        if ord(c) > 127:
+            # Try to normalize, else flag
+            normalized = unicodedata.normalize('NFKD', c)
+            if all(ord(x) < 128 for x in normalized):
+                return normalized
+            issues.append(f"Non-ASCII character: '{c}' (U+{ord(c):04X})")
+            return ''
+        return c
+    cleaned = ''.join(replace_char(c) for c in text)
+    # Flag other ATS-unfriendly patterns
+    if re.search(r'[\u2022\u25CF\u25A0]', text):
+        issues.append("Bullet symbols detected. Use '-' or '*' instead.")
+    if re.search(r'[\u00A0]', text):
+        issues.append("Non-breaking spaces detected. Use regular spaces.")
+    # Warn about tables or images (very basic check)
+    if re.search(r'\|', text):
+        issues.append("Vertical bars '|' detected. Avoid tables for ATS.")
+    return cleaned, issues
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -51,6 +107,7 @@ class ExperienceEntry(BaseModel):
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM or 'present' format")
     highlights: List[str] = Field(..., description="List of action-oriented highlights for the role. Quantify achievements where possible. Tailor these to the job description.")
+    summary: Optional[str] = Field(default=None, description="A brief summary of the role. Tailor this to the job description. Don't include if not applicable.")   
 
 class EducationEntry(BaseModel):
     institution: str
@@ -60,6 +117,7 @@ class EducationEntry(BaseModel):
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM format")
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM format")
     highlights: Optional[List[str]] = Field(default=None, description="List of highlights or relevant coursework. Tailor these to the job description. Don't include if not applicable.")
+    summary: Optional[str] = Field(default=None, description="A brief summary of the education entry. Tailor this to the job description. Don't include if not applicable.")
 
 
 class OneLineEntry(BaseModel):
@@ -69,9 +127,9 @@ class OneLineEntry(BaseModel):
 # Personal Project Entry Model
 class PersonalProjectEntry(BaseModel):
     name: str
-    description: str = Field(..., description="Brief description of the project, including technologies used and impact.")
-    url: Optional[HttpUrl] = Field(default=None, description="Link to the project (GitHub, website, etc.)")
+    summary: str = Field(..., description="Brief description of the project, including technologies used and impact.")
     highlights: Optional[List[str]] = Field(default=None, description="Key achievements or features. Tailor these to the job description.")
+    url: Optional[HttpUrl] = Field(default=None, description="URL to the project or repository. Omit if not applicable.")
 
 class PublicationsEntry(BaseModel):
     title: str
@@ -80,13 +138,15 @@ class PublicationsEntry(BaseModel):
     journal: str
     date: Optional[str] = Field(default=None, description="Publication date in YYYY format")
     url: HttpUrl
+    
 
 class Sections(BaseModel):
     Summary: List[str] = Field(..., description="A 2-3 sentence professional summary, tailored to the job description, split into a list of strings.")
     Skills: List[OneLineEntry]
     Education: List[EducationEntry]
     Experience: List[ExperienceEntry]
-    Publications: List[PublicationsEntry]
+    AdditionalExperience: Optional[List[ExperienceEntry]] = Field(default=None, description="Additional experience entries that may not fit to the job description in case the user wants to include them.")
+    Publications: Optional[List[PublicationsEntry]] = Field(default=None, description="List of publications. Optional; omit if not applicable.")
     PersonalProjects: Optional[List[PersonalProjectEntry]] = Field(default=None, description="List of personal projects relevant to the job. Each entry should highlight technologies, impact, and relevance.")
 
 # This is required for Pydantic v1/v2 compatibility for forward references.
@@ -103,40 +163,49 @@ def _build_prompt(resume: str, job_desc: str) -> str:
     - Highlight merging/splitting guidelines
     """
 
+
     return f"""
 **Role**: You are a world-class professional resume writer and career-coach AI. Your mission is to transform a generic resume into a highly-tailored, compelling CV optimized for a specific job description.
+
+**CRITICAL RULE: NO HALLUCINATION**
+You must NEVER invent, infer, or add any information that is not explicitly present in the resume. If a detail is not present in the resume, you must omit it, even if it appears in the job description. Do not guess, synthesize, or fill in gaps from the job description. Only bold or emphasize keywords from the job description if they are present in the resume content.
 
 **Objective**: Produce **one** JSON object that conforms **exactly** to the provided Pydantic and rendercv (v2) schema.
 
 ---
 **Non-Negotiable Constraints**
-1. **Schema Fidelity** - Output **must** be valid JSON matching the `CV` model (no extra keys).
-2. **No Hallucination** - Omit any detail not present in the resume. If a field is missing, leave it out.
-3. **Relevancy Filter** - Include *only* experience, skills, education, and personal projects that directly or indirectly support the job description. Drop the rest.
-4. **Highlights Hygiene** -
+1. **NO HALLUCINATION** - Only include details that are explicitly present in the resume. If a field is missing, leave it out. Do not add, infer, or guess any information from the job description.
+2. **Schema Fidelity** - Output **must** be valid JSON matching the `CV` model (no extra keys).
+3. **Relevancy Filter** - Include *only* experience, skills, education, and personal projects that directly or indirectly support the job description, but only if they are present in the resume. Drop the rest.
+4. **Additional Experience** - Rewrite and include all experience entries that did not fit the job description and were not included in the experience section. User may add these entries explicitly if they want to include them.
+5. **Highlights Hygiene** -
    - Split overly long or compound highlights into concise bullets (≤2 lines each).
    - Each Experience can have up to 4 highlights for recent roles and 3 for older roles.
    - Each Personal Project can have up to 3 highlights, focused on technologies, impact, and relevance to the job.
-5. **Action Verbs & Metrics** - Start bullets with strong verbs (e.g., "Led", "Architected") and quantify impact when possible (e.g., "Increased efficiency by 30%," "Managed a team of 5"). 
-6. **Markdown Emphasis** - Bold (`**`) any keyword that *exactly* matches a skill or responsibility from the job description (in `highlights`, `summary`, and `personal projects`).
-7. **Date Format** - Use YYYY-MM, YYYY, or "present" exactly as defined in the schema.
-8. **Username Extraction** - Return only usernames for social links (e.g., GitHub, LinkedIn).
-9. **Single-Page Target** - Keep the final CV to about **one page** (≈500-600 words when rendered). Trim or omit less critical details to fit including old experiences, non-relevant skills, and other extraneous information.
+6. **Action Verbs & Metrics** - Start bullets with strong verbs (e.g., "Led", "Architected") and quantify impact when possible (e.g., "Increased efficiency by 30%," "Managed a team of 5") but don't hallucinate quantification.
+7. **Markdown Emphasis** - Bold (`**`) any keyword that *exactly* matches a skill or responsibility from the job description (in `highlights`, `summary`, and `personal projects`), but only if that keyword is present in the resume.
+8. **Date Format** - Use YYYY-MM, YYYY, or "present" exactly as defined in the schema.
+9. **Username Extraction** - Return only usernames for social links (e.g., GitHub, LinkedIn).
+10. **Single-Page Target** - Keep the final CV to about **one page** (≈500-600 words when rendered). Trim or omit less critical details to fit including old experiences, non-relevant skills, and other extraneous information.
+11. **Publications** - Must include this section if it is present in the resume. It follow the same rules as Experience and Education regarding highlights and relevance.
+12. **Personal Projects** - Must include this section if it is present in the resume. It follow the same rules as Experience and Education regarding highlights and relevance.
 
 ---
 **Step-by-Step Process (internal - do not output)**
-1. **Analyse Inputs** - Identify the 5-7 most critical keywords/skills from the Job Description that are strongly relevant to the user's background. Map resume content to those.
+1. **Analyse Inputs** - Identify the 5-7 most critical keywords/skills from the Job Description that are strongly relevant to the user's background. Map resume content to those, but do NOT add any new content from the job description unless it is present in the resume.
 2. **Synthesise Content** -
-   - **Summary** - 2-3 sentences (≤3 lines totally) that pitch the candidate using those keywords.
-   - **Experience** - Rewrite recent roles; keep or remove older ones based on relevance. Ensure highlights follow Constraint 4 and overall length supports the single-page goal.
-   - **Skills** - Present only relevant skills, grouped under clear labels. Add missing JD keywords (**bolded**) if absent in resume but seems suitable.
-   - **Education** - Generally does not need any highlights. Only include entries when they directly strengthen candidacy for the role.
-   - **Personal Projects** - Include personal projects that demonstrate relevant skills, technologies, or impact. Focus on those most relevant to the job description. Personal projects is an optional section, so if no relevant projects exist, this section can be omitted.
+   - **Summary** - 2-3 sentences (≤3 lines totally) that pitch the candidate using only those keywords that are present in the resume.
+   - **Experience** - Rewrite recent roles and their highlights; rewrite or remove older ones based on relevance. Ensure highlights follow Constraint 4 and overall length supports the single-page goal. Do not add any new experience or skills from the job description.
+   - **Skills** - Present only relevant skills, grouped under clear labels. Do not add missing JD keywords unless they are present in the resume.
+   - **Education** - Generally does not need any highlights. Only include entries when they directly strengthen candidacy for the role and are present in the resume.
+   - **Publications** - Include publications to showcase expertise, but only if present in the resume. Publications is an optional section, so if no relevant publications exist, this section can be omitted. For author names (if present), write every author name in the format "First letter of first name. Last name" (e.g., "J. Smith") except for the resume owner's name which should be written in full.
+   - **Personal Projects** - Include personal projects that demonstrate relevant skills, technologies, or impact, but only if present in the resume. Personal projects is an optional section, so if no relevant projects exist, this section can be omitted.
 3. **Assemble JSON** - Populate the `CV` object and return *only* the JSON.
 
 ---
 **Resume Content**:
 {resume}
+
 ---
 **Job Description**:
 {job_desc}
@@ -153,13 +222,38 @@ def get_completion(resume_content, job_description_content, api_key):
         cv_instance = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema. "
+                        "Your goal is to transform my resume into a concise, impact‑oriented document that mirrors the language of the target job ad."
+                        "You must NEVER hallucinate or invent any information. Only include details that are explicitly present in the resume. "
+                        "If a detail is not present in the resume, you must omit it, even if it appears in the job description. "
+                        "Strictly follow the anti-hallucination rule: do not infer, guess, or add any content from the job description unless it is also present in the resume."
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
             response_model=CV,
         )
         # The response is already a Pydantic object, so we convert it to a dict
-        return cv_instance.model_dump()
+        output_dict = cv_instance.model_dump()
+        # --- Post-processing hallucination check ---
+        resume_lower = resume_content.lower()
+        hallucinated_fields = []
+        # Check for hallucinated skills
+        try:
+            skills = output_dict.get('sections', {}).get('Skills', [])
+            for entry in skills:
+                for detail in entry['details'].split(','):
+                    if detail.strip().lower() not in resume_lower and entry['label'].lower() not in resume_lower:
+                        hallucinated_fields.append(f"{entry['label']} - {detail.strip()}")
+        except Exception:
+            pass
+        # Warn user if hallucinations detected
+        if hallucinated_fields:
+            st.warning("Possible hallucinated content detected in the generated CV. Please review these entries and ensure they exist in your original resume:\n" + "\n".join(hallucinated_fields))
+        return output_dict
     except ValidationError as e:
         st.error("AI response did not match the required data structure:")
         st.error(e)
@@ -301,6 +395,10 @@ if st.button("Generate Tailored Application"):
         if st.session_state.output:
             # Construct the full data structure for YAML
             generated_cv_content = st.session_state.output
+            # Remove empty sections from the generated CV content
+            generated_cv_content['sections'] = {
+                k: v for k, v in generated_cv_content['sections'].items() if v is not None
+            }
             full_cv_data = {
                 "cv": generated_cv_content,
                 "design": {
@@ -318,6 +416,11 @@ if st.button("Generate Tailored Application"):
                     },
                     "header": {
                         "horizontal_space_between_connections": "0.2cm",
+                        "vertical_space_between_name_and_connections": "0.2cm"
+                    },
+                    "section_titles": {
+                        "vertical_space_above": "0.4cm",
+                        "vertical_space_below": "0.2cm"
                     },
                     "entries": {
                         "vertical_space_between_entries": "0.8em",
@@ -325,22 +428,61 @@ if st.button("Generate Tailored Application"):
                     },
                     "highlights": {
                         "vertical_space_between_highlights": "0.2cm"
+                    },
+                    "entry_types": {
+                        "one_line_entry": {
+                            "template": "**LABEL:** DETAILS"
+                        },
+                        "education_entry": {
+                            "main_column_first_row_template": "**INSTITUTION**, DEGREE in AREA -- LOCATION",
+                            "degree_column_template": None,
+                            "degree_column_width": "1cm",
+                            "main_column_second_row_template": "SUMMARY\nHIGHLIGHTS",
+                            "date_and_location_column_template": "DATE"
+                        },
+                        "normal_entry": {
+                            "main_column_first_row_template": "**NAME** -- **URL**",
+                            "main_column_second_row_template": "SUMMARY\nHIGHLIGHTS",
+                            "date_and_location_column_template": "DATE"
+                        },
+                        "experience_entry": {
+                            "main_column_first_row_template": "**POSITION**, COMPANY -- LOCATION",
+                            "main_column_second_row_template": "SUMMARY\nHIGHLIGHTS",
+                            "date_and_location_column_template": "DATE"
+                        },
+                        "publication_entry": {
+                            "main_column_first_row_template": "**TITLE**",
+                            "main_column_second_row_template": "AUTHORS\nURL (JOURNAL)",
+                            "main_column_second_row_without_journal_template": "AUTHORS\nURL",
+                            "main_column_second_row_without_url_template": "AUTHORS\nJOURNAL",
+                            "date_and_location_column_template": "DATE"
+                        }
                     }
                 },
                 "locale": {
                     "language": "en"
                 }
             }
-            st.session_state.yaml_for_editing = yaml.dump(full_cv_data, default_flow_style=False, sort_keys=False)
+            cleaned_data, ats_issues = ats_clean_data(full_cv_data)
+            yaml_str = yaml.dump(cleaned_data, default_flow_style=False, sort_keys=False)
+            st.session_state.yaml_for_editing = yaml_str
+            st.session_state.ats_audit_issues = ats_issues
             st.session_state.pdf_bytes = None # Clear any previously generated PDF
         else:
             st.session_state.yaml_for_editing = ""
+            st.session_state.ats_audit_issues = []
     else:
         st.error("Please upload a resume and paste a job description.")
 
 if st.session_state.yaml_for_editing:
     st.markdown("---")
     st.subheader("Edit Generated Resume Data (YAML)")
+    # ATS Audit Report
+    ats_issues = st.session_state.get('ats_audit_issues', [])
+    if ats_issues:
+        st.warning("**ATS Audit Report:**\n" + "\n".join(f"- {issue}" for issue in ats_issues))
+    else:
+        st.info("ATS Audit: No major issues detected. Your resume should be ATS-friendly.")
     
     # Using a key helps Streamlit manage the state of this component better.
     # The code_editor component returns a dictionary with the edited text and button clicks.
