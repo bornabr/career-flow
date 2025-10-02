@@ -1,3 +1,22 @@
+import streamlit as st
+from openai import OpenAI
+import fitz  # PyMuPDF
+import io
+import json
+from pydantic import BaseModel, Field, ValidationError, HttpUrl
+from typing import List, Optional
+import instructor
+import datetime
+import subprocess
+import yaml
+import uuid
+from rendercv.cli.commands import cli_command_render
+import base64
+from code_editor import code_editor
+from streamlit_local_storage import LocalStorage
+from streamlit_pdf_viewer import pdf_viewer
+import contextlib
+
 # Recursively clean all string values in a dict/list for ATS-friendliness
 def ats_clean_data(data):
     issues = []
@@ -17,6 +36,16 @@ def ats_clean_data(data):
 # --- ATS Friendliness Audit ---
 import unicodedata
 import re
+import os
+from dotenv import load_dotenv
+load_dotenv()
+MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-4o")
+print(f"Using OpenAI model: {MODEL_NAME}")
+
+# Pydantic Models for RenderCV Structure
+# These models define the exact structure RenderCV expects.
+
+MOCK_TEST = False  # Set to True for development/testing with mock data
 
 def ats_friendly_text(text: str):
     """
@@ -54,34 +83,6 @@ def ats_friendly_text(text: str):
     if re.search(r'\|', text):
         issues.append("Vertical bars '|' detected. Avoid tables for ATS.")
     return cleaned, issues
-import os
-from dotenv import load_dotenv
-load_dotenv()
-MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-4o")
-print(f"Using OpenAI model: {MODEL_NAME}")
-
-import streamlit as st
-from openai import OpenAI
-import fitz  # PyMuPDF
-import io
-import json
-from pydantic import BaseModel, Field, ValidationError, HttpUrl
-from typing import List, Optional
-import instructor
-import datetime
-import subprocess
-import yaml
-import uuid
-from rendercv.cli.commands import cli_command_render
-import base64
-from code_editor import code_editor
-from streamlit_local_storage import LocalStorage
-from streamlit_pdf_viewer import pdf_viewer
-
-# Pydantic Models for RenderCV Structure
-# These models define the exact structure RenderCV expects.
-
-MOCK_TEST = False  # Set to True for development/testing with mock data
 
 class SocialNetwork(BaseModel):
     network: str
@@ -527,23 +528,47 @@ if st.session_state.yaml_for_editing:
                     output_file_path = "tailored_resume.pdf"
                     
                     # 2. Run RenderCV's render command directly from Python
-                    cli_command_render(
-                        input_file_name=yaml_file_name,
-                        pdf_path=output_file_path,
-                        dont_generate_markdown=True,
-                        dont_generate_html=True,
-                        dont_generate_png=True
-                    )
-
-                    # 3. Check if the file was created and is not empty
-                    if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
-                        with open(output_file_path, "rb") as pdf_file:
-                            st.session_state.pdf_bytes = pdf_file.read()
+                    render_output_buffer = io.StringIO()
+                    render_failed = False
+                    render_message = ""
+                    try:
+                        with contextlib.redirect_stdout(render_output_buffer), contextlib.redirect_stderr(render_output_buffer):
+                            cli_command_render(
+                                input_file_name=yaml_file_name,
+                                pdf_path=output_file_path,
+                                dont_generate_markdown=True,
+                                dont_generate_html=True,
+                                dont_generate_png=True
+                            )
+                    except SystemExit as render_exit:
+                        render_message = render_output_buffer.getvalue()
+                        if render_exit.code != 0:
+                            render_failed = True
+                            if not render_message.strip():
+                                render_message = f"RenderCV exited with code {render_exit.code}."
+                    except Exception as render_exception:
+                        render_message = render_output_buffer.getvalue().strip() or str(render_exception)
+                        render_failed = True
                     else:
-                        st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
+                        render_message = render_output_buffer.getvalue()
+
+                    if render_failed:
                         st.session_state.pdf_bytes = None
-                        if os.path.exists(output_file_path):
-                            st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
+                        st.error("RenderCV could not generate the PDF from the current YAML. Please address the error below and try again.")
+                        if render_message.strip():
+                            st.code(render_message.rstrip(), language="text")
+                        else:
+                            st.info("RenderCV did not return an explicit error message.")
+                    else:
+                        # 3. Check if the file was created and is not empty
+                        if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
+                            with open(output_file_path, "rb") as pdf_file:
+                                st.session_state.pdf_bytes = pdf_file.read()
+                        else:
+                            st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
+                            st.session_state.pdf_bytes = None
+                            if os.path.exists(output_file_path):
+                                st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
 
                 except Exception as e:
                     st.error(f"An unexpected error occurred during PDF generation: {e}")
