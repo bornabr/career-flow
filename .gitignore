@@ -9,3 +9,5 @@ rendercv_output
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 .env
+
+__pycache__

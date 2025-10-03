@@ -1,11 +1,9 @@
 import streamlit as st
-from openai import OpenAI
 import fitz  # PyMuPDF
 import io
 import json
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
 from typing import List, Optional
-import instructor
 import datetime
 import subprocess
 import yaml
@@ -16,6 +14,13 @@ from code_editor import code_editor
 from streamlit_local_storage import LocalStorage
 from streamlit_pdf_viewer import pdf_viewer
 import contextlib
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.google import GoogleProvider
 
 # Recursively clean all string values in a dict/list for ATS-friendliness
 def ats_clean_data(data):
@@ -39,8 +44,9 @@ import re
 import os
 from dotenv import load_dotenv
 load_dotenv()
-MODEL_NAME = os.environ.get("OPENAI_MODEL", "gpt-4o")
-print(f"Using OpenAI model: {MODEL_NAME}")
+MODEL_NAME = os.environ.get("MODEL_NAME", "openai:gpt-4o")
+PROVIDER = MODEL_NAME.split(":")[0] if ":" in MODEL_NAME else "openai"
+print(f"Using {PROVIDER} model: {MODEL_NAME}")
 
 # Pydantic Models for RenderCV Structure
 # These models define the exact structure RenderCV expects.
@@ -213,32 +219,48 @@ You must NEVER invent, infer, or add any information that is not explicitly pres
 ---
 """
 
-def get_completion(resume_content, job_description_content, api_key):
-    # Patch the client with instructor
-    client = instructor.patch(OpenAI(api_key=api_key))
+def get_model_instance(api_key: str):
+    """Create a PydanticAI model instance based on the configured provider."""
+    model_name = MODEL_NAME.split(":")[-1]
+
+    if PROVIDER == "openai":
+        provider = OpenAIProvider(api_key=api_key)
+        return OpenAIChatModel(model_name, provider=provider)
+    elif PROVIDER == "anthropic":
+        provider = AnthropicProvider(api_key=api_key)
+        return AnthropicModel(model_name, provider=provider)
+    elif PROVIDER == "google" or PROVIDER == "gemini":
+        provider = GoogleProvider(api_key=api_key)
+        return GoogleModel(model_name, provider=provider)
+    else:
+        raise ValueError(f"Unsupported provider: {PROVIDER}. Supported providers: openai, anthropic, google/gemini")
+
+async def get_completion_async(resume_content, job_description_content, api_key):
+    """Async version using PydanticAI Agent."""
+    model = get_model_instance(api_key)
+
+    # Create PydanticAI Agent with the CV response model
+    agent = Agent(
+        model,
+        output_type=CV,
+        system_prompt=(
+            "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema. "
+            "Your goal is to transform my resume into a concise, impact‑oriented document that mirrors the language of the target job ad."
+            "You must NEVER hallucinate or invent any information. Only include details that are explicitly present in the resume. "
+            "If a detail is not present in the resume, you must omit it, even if it appears in the job description. "
+            "Strictly follow the anti-hallucination rule: do not infer, guess, or add any content from the job description unless it is also present in the resume."
+        )
+    )
 
     prompt = _build_prompt(resume_content, job_description_content)
     try:
-        # Use the response_model parameter to get structured output
-        cv_instance = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a career-coach AI that returns JSON structured according to the provided Pydantic schema. "
-                        "Your goal is to transform my resume into a concise, impact‑oriented document that mirrors the language of the target job ad."
-                        "You must NEVER hallucinate or invent any information. Only include details that are explicitly present in the resume. "
-                        "If a detail is not present in the resume, you must omit it, even if it appears in the job description. "
-                        "Strictly follow the anti-hallucination rule: do not infer, guess, or add any content from the job description unless it is also present in the resume."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            response_model=CV,
-        )
-        # The response is already a Pydantic object, so we convert it to a dict
+        # Run the agent with the prompt
+        result = await agent.run(prompt)
+
+        # Get the Pydantic model from result
+        cv_instance = result.output
         output_dict = cv_instance.model_dump()
+
         # --- Post-processing hallucination check ---
         resume_lower = resume_content.lower()
         hallucinated_fields = []
@@ -263,13 +285,32 @@ def get_completion(resume_content, job_description_content, api_key):
         st.error(f"An unexpected error occurred: {e}")
         return None
 
+def get_completion(resume_content, job_description_content, api_key):
+    """Synchronous wrapper for the async function."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(get_completion_async(resume_content, job_description_content, api_key))
+
 # Cover Letter Generation Function
-def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) -> str:
+async def generate_cover_letter_async(yaml_resume: str, job_description: str, api_key: str) -> str:
     """
-    Generate a tailored cover letter using OpenAI, given the YAML resume and job description.
+    Generate a tailored cover letter using PydanticAI, given the YAML resume and job description.
     Returns the cover letter text or None on error.
     """
-    client = OpenAI(api_key=api_key)
+    model = get_model_instance(api_key)
+
+    # Create PydanticAI Agent for cover letter generation
+    agent = Agent(
+        model,
+        output_type=str,
+        system_prompt="You are a career-coach AI that writes tailored cover letters."
+    )
+
     prompt = f"""
 You are a world-class professional resume writer and career-coach AI. Your mission is to write a compelling, tailored cover letter for a job application.
 
@@ -289,18 +330,22 @@ You are a world-class professional resume writer and career-coach AI. Your missi
 ---
 """
     try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": "You are a career-coach AI that writes tailored cover letters."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        # Extract the cover letter text from the response
-        return response.choices[0].message.content.strip()
+        result = await agent.run(prompt)
+        return result.output.strip()
     except Exception as e:
         st.error(f"An error occurred while generating the cover letter: {e}")
         return None
+
+def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) -> str:
+    """Synchronous wrapper for the async function."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(generate_cover_letter_async(yaml_resume, job_description, api_key))
 
 st.title("Career Flow - AI Job Application Assistant")
 
@@ -316,8 +361,8 @@ def set_api_key(key):
 # Get the API key from local storage
 stored_api_key = get_api_key()
 api_key = st.text_input(
-    "Enter your OpenAI API Key", 
-    type="password", 
+    f"Enter your {PROVIDER.upper()} API Key",
+    type="password",
     help="Your API key is stored securely in your browser's local storage.",
     value=stored_api_key if stored_api_key else ""
 )
@@ -367,7 +412,7 @@ if resume_file is not None:
 
 if st.button("Generate Tailored Application"):
     if not api_key:
-        st.error("Please enter your OpenAI API key to proceed.")
+        st.error(f"Please enter your {PROVIDER.upper()} API key to proceed.")
     elif st.session_state.resume_text and job_description:
         if MOCK_TEST:
             with st.spinner("Generating your tailored application... (using mock data)"):
@@ -597,7 +642,7 @@ if st.session_state.yaml_for_editing:
 
     if st.button("Generate Cover Letter"):
         if not api_key:
-            st.error("Please enter your OpenAI API key to proceed.")
+            st.error(f"Please enter your {PROVIDER.upper()} API key to proceed.")
         elif not st.session_state.yaml_for_editing or not job_description:
             st.error("YAML resume and job description are required to generate a cover letter.")
         else:

@@ -8,12 +8,10 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.10, <4.0"
-openai = ">=1.96.1,<2.0.0"
 streamlit = ">=1.46.1,<2.0.0"
 "rendercv" = {extras = ["full"], version = ">=2.2,<3.0"}
 pyyaml = ">=6.0.2,<7.0.0"
-pydantic = "==2.10.5"
-instructor = ">=1.9.2,<2.0.0"
+pydantic-ai-slim = {extras = ["openai", "anthropic", "google"], version = ">=1.0.0,<2.0.0"}
 streamlit-code-editor = ">=0.1.22,<0.2.0"
 streamlit-local-storage = "^0.0.25"
 pymupdf = "^1.26.3"
