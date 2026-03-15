@@ -1,15 +1,38 @@
-rendercv_output
-
-.DS_Store
-*.json
-*.pdf
-
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-.env
-
-__pycache__
-
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
 *.pyc
+
+# Build outputs
+dist/
+.next/
+.turbo/
+packages/shared/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+*.egg-info/
+*.egg
+build/
+
+# Generated
+*.pdf
+rendercv_output/
+
+# Misc
+.cache/
