@@ -34,6 +34,8 @@ def ats_clean_data(data):
             return [_clean(v) for v in val]
         elif isinstance(val, dict):
             return {k: _clean(v) for k, v in val.items()}
+        elif isinstance(val, HttpUrl):
+            return str(val)
         else:
             return val
     cleaned_data = _clean(data)
@@ -160,7 +162,7 @@ class Sections(BaseModel):
 CV.model_rebuild()
 Sections.model_rebuild()
 
-def _build_prompt(resume: str, job_desc: str) -> str:
+def _build_prompt(resume: str, job_desc: str, user_prompt: Optional[str] = None) -> str:
     """Construct the system/user prompt with strict instructions.
 
     The prompt enforces:
@@ -170,6 +172,9 @@ def _build_prompt(resume: str, job_desc: str) -> str:
     - Highlight merging/splitting guidelines
     """
 
+    user_section = ""
+    if user_prompt:
+        user_section = f"**Additional User Instructions:**\n{user_prompt}\n\n"
 
     return f"""
 **Role**: You are a world-class professional resume writer and career-coach AI. Your mission is to transform a generic resume into a highly-tailored, compelling CV optimized for a specific job description.
@@ -210,7 +215,7 @@ You must NEVER invent, infer, or add any information that is not explicitly pres
 3. **Assemble JSON** - Populate the `CV` object and return *only* the JSON.
 
 ---
-**Resume Content**:
+{user_section}**Resume Content**:
 {resume}
 
 ---
@@ -235,7 +240,7 @@ def get_model_instance(api_key: str):
     else:
         raise ValueError(f"Unsupported provider: {PROVIDER}. Supported providers: openai, anthropic, google/gemini")
 
-async def get_completion_async(resume_content, job_description_content, api_key):
+async def get_completion_async(resume_content, job_description_content, api_key, user_prompt: Optional[str] = None):
     """Async version using PydanticAI Agent."""
     model = get_model_instance(api_key)
 
@@ -252,7 +257,7 @@ async def get_completion_async(resume_content, job_description_content, api_key)
         )
     )
 
-    prompt = _build_prompt(resume_content, job_description_content)
+    prompt = _build_prompt(resume_content, job_description_content, user_prompt=user_prompt)
     try:
         # Run the agent with the prompt
         result = await agent.run(prompt)
@@ -285,7 +290,7 @@ async def get_completion_async(resume_content, job_description_content, api_key)
         st.error(f"An unexpected error occurred: {e}")
         return None
 
-def get_completion(resume_content, job_description_content, api_key):
+def get_completion(resume_content, job_description_content, api_key, user_prompt: Optional[str] = None):
     """Synchronous wrapper for the async function."""
     import asyncio
     try:
@@ -294,10 +299,15 @@ def get_completion(resume_content, job_description_content, api_key):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    return loop.run_until_complete(get_completion_async(resume_content, job_description_content, api_key))
+    return loop.run_until_complete(get_completion_async(resume_content, job_description_content, api_key, user_prompt=user_prompt))
 
 # Cover Letter Generation Function
-async def generate_cover_letter_async(yaml_resume: str, job_description: str, api_key: str) -> str:
+async def generate_cover_letter_async(
+    yaml_resume: str,
+    job_description: str,
+    api_key: str,
+    user_prompt: Optional[str] = None,
+) -> str:
     """
     Generate a tailored cover letter using PydanticAI, given the YAML resume and job description.
     Returns the cover letter text or None on error.
@@ -311,6 +321,10 @@ async def generate_cover_letter_async(yaml_resume: str, job_description: str, ap
         system_prompt="You are a career-coach AI that writes tailored cover letters."
     )
 
+    additional_instructions_section = ""
+    if user_prompt:
+        additional_instructions_section = f"**Additional User Instructions:**\n{user_prompt}\n---\n"
+
     prompt = f"""
 You are a world-class professional resume writer and career-coach AI. Your mission is to write a compelling, tailored cover letter for a job application.
 
@@ -322,7 +336,7 @@ You are a world-class professional resume writer and career-coach AI. Your missi
 5. Output only the cover letter text, no formatting or extra commentary.
 
 ---
-**Resume YAML:**
+{additional_instructions_section}**Resume YAML:**
 {yaml_resume}
 ---
 **Job Description:**
@@ -336,7 +350,12 @@ You are a world-class professional resume writer and career-coach AI. Your missi
         st.error(f"An error occurred while generating the cover letter: {e}")
         return None
 
-def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) -> str:
+def generate_cover_letter(
+    yaml_resume: str,
+    job_description: str,
+    api_key: str,
+    user_prompt: Optional[str] = None,
+) -> str:
     """Synchronous wrapper for the async function."""
     import asyncio
     try:
@@ -345,7 +364,14 @@ def generate_cover_letter(yaml_resume: str, job_description: str, api_key: str) 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    return loop.run_until_complete(generate_cover_letter_async(yaml_resume, job_description, api_key))
+    return loop.run_until_complete(
+        generate_cover_letter_async(
+            yaml_resume,
+            job_description,
+            api_key,
+            user_prompt=user_prompt,
+        )
+    )
 
 st.title("Career Flow - AI Job Application Assistant")
 
@@ -382,6 +408,11 @@ if 'pdf_bytes' not in st.session_state:
 
 resume_file = st.file_uploader("Upload your resume (txt or pdf)", type=["txt", "pdf"])
 job_description = st.text_area("Paste the job description here")
+user_prompt_input = st.text_area(
+    "Additional instructions for the AI (optional)",
+    help="Add any extra guidance you want the AI to follow beyond the default system instructions.",
+)
+user_prompt = user_prompt_input.strip() if user_prompt_input else ""
 
 if resume_file is not None:
     if resume_file.type == "application/pdf":
@@ -435,7 +466,12 @@ if st.button("Generate Tailored Application"):
                 st.session_state.output = resume_data
         else:
             with st.spinner("Generating your tailored application..."):
-                resume_data = get_completion(st.session_state.resume_text, job_description, api_key)
+                resume_data = get_completion(
+                    st.session_state.resume_text,
+                    job_description,
+                    api_key,
+                    user_prompt=user_prompt or None,
+                )
                 st.session_state.output = resume_data
         
         if st.session_state.output:
@@ -555,6 +591,62 @@ if st.session_state.yaml_for_editing:
         st.session_state.yaml_for_editing = response_dict['text']
         st.session_state.pdf_bytes = None # Clear old PDF on edit
 
+# AI Auto-Fix Function
+async def fix_yaml_with_ai_async(yaml_content: str, error_message: str, api_key: str) -> str:
+    """
+    Uses the AI to fix a broken YAML file based on an error message.
+    """
+    model = get_model_instance(api_key)
+    agent = Agent(
+        model,
+        output_type=str,
+        system_prompt=(
+            "You are an expert YAML debugger for RenderCV. "
+            "Your task is to fix the provided YAML content so that it resolves the reported error. "
+            "Return ONLY the fixed YAML content. Do not include any markdown formatting (like ```yaml), explanations, or comments. "
+            "Ensure the output is valid YAML."
+        )
+    )
+    
+    prompt = f"""
+    The following YAML content failed to generate a PDF with RenderCV.
+    
+    **Error Message:**
+    {error_message}
+    
+    **Broken YAML:**
+    {yaml_content}
+    
+    Please fix the YAML to resolve the error.
+    """
+    
+    try:
+        result = await agent.run(prompt)
+        # Clean up potential markdown formatting if the model ignores instructions
+        cleaned_output = result.output.strip()
+        if cleaned_output.startswith("```yaml"):
+            cleaned_output = cleaned_output[7:]
+        if cleaned_output.startswith("```"):
+            cleaned_output = cleaned_output[3:]
+        if cleaned_output.endswith("```"):
+            cleaned_output = cleaned_output[:-3]
+        return cleaned_output.strip()
+    except Exception as e:
+        st.error(f"AI Auto-Fix failed: {e}")
+        return None
+
+def fix_yaml_with_ai(yaml_content: str, error_message: str, api_key: str) -> str:
+    """Synchronous wrapper for the async function."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(fix_yaml_with_ai_async(yaml_content, error_message, api_key))
+
+# ... inside the button click handler ...
     # Check if the 'Generate PDF' button was clicked.
     if response_dict['type'] == "submit":
         with st.spinner("Generating PDF from edited YAML..."):
@@ -563,65 +655,106 @@ if st.session_state.yaml_for_editing:
             if not yaml_string:
                 st.error("Cannot generate PDF from empty YAML. Please ensure there is content in the editor.")
             else:
-                yaml_file_name = None
+                # --- Validation & Auto-Fix Step ---
                 try:
-                    # 1. Create a temporary YAML file
-                    yaml_file_name = f"temp_cv_{uuid.uuid4()}.yaml"
-                    with open(yaml_file_name, 'w') as f:
-                        f.write(yaml_string)
-
-                    output_file_path = "tailored_resume.pdf"
+                    from validator import CVValidator
+                    # Load YAML to dict
+                    data = yaml.safe_load(yaml_string)
                     
-                    # 2. Run RenderCV's render command directly from Python
-                    render_output_buffer = io.StringIO()
-                    render_failed = False
-                    render_message = ""
+                    # Run validation and fix
+                    fixed_data, issues = CVValidator.validate_and_fix(data)
+                    
+                    # If data was modified, update the YAML string
+                    if fixed_data != data:
+                        yaml_string = yaml.dump(fixed_data, default_flow_style=False, sort_keys=False)
+                        
+                except Exception as val_e:
+                    st.warning(f"Validation warning: {val_e}. Proceeding with original data.")
+
+                # Retry loop for AI Auto-Fix
+                max_retries = 1
+                attempt = 0
+                success = False
+                
+                while attempt <= max_retries and not success:
+                    attempt += 1
+                    yaml_file_name = None
                     try:
-                        with contextlib.redirect_stdout(render_output_buffer), contextlib.redirect_stderr(render_output_buffer):
-                            cli_command_render(
-                                input_file_name=yaml_file_name,
-                                pdf_path=output_file_path,
-                                dont_generate_markdown=True,
-                                dont_generate_html=True,
-                                dont_generate_png=True
-                            )
-                    except SystemExit as render_exit:
-                        render_message = render_output_buffer.getvalue()
-                        if render_exit.code != 0:
+                        # 1. Create a temporary YAML file
+                        yaml_file_name = f"temp_cv_{uuid.uuid4()}.yaml"
+                        with open(yaml_file_name, 'w') as f:
+                            f.write(yaml_string)
+
+                        output_file_path = "tailored_resume.pdf"
+                        
+                        # 2. Run RenderCV's render command directly from Python
+                        render_output_buffer = io.StringIO()
+                        render_failed = False
+                        render_message = ""
+                        try:
+                            with contextlib.redirect_stdout(render_output_buffer), contextlib.redirect_stderr(render_output_buffer):
+                                cli_command_render(
+                                    input_file_name=yaml_file_name,
+                                    pdf_path=output_file_path,
+                                    dont_generate_markdown=True,
+                                    dont_generate_html=True,
+                                    dont_generate_png=True
+                                )
+                        except SystemExit as render_exit:
+                            render_message = render_output_buffer.getvalue()
+                            if render_exit.code != 0:
+                                render_failed = True
+                                if not render_message.strip():
+                                    render_message = f"RenderCV exited with code {render_exit.code}."
+                        except Exception as render_exception:
+                            render_message = render_output_buffer.getvalue().strip() or str(render_exception)
                             render_failed = True
-                            if not render_message.strip():
-                                render_message = f"RenderCV exited with code {render_exit.code}."
-                    except Exception as render_exception:
-                        render_message = render_output_buffer.getvalue().strip() or str(render_exception)
-                        render_failed = True
-                    else:
-                        render_message = render_output_buffer.getvalue()
+                        else:
+                            render_message = render_output_buffer.getvalue()
 
-                    if render_failed:
-                        st.session_state.pdf_bytes = None
-                        st.error("RenderCV could not generate the PDF from the current YAML. Please address the error below and try again.")
-                        if render_message.strip():
-                            st.code(render_message.rstrip(), language="text")
-                        else:
-                            st.info("RenderCV did not return an explicit error message.")
-                    else:
-                        # 3. Check if the file was created and is not empty
-                        if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
-                            with open(output_file_path, "rb") as pdf_file:
-                                st.session_state.pdf_bytes = pdf_file.read()
-                        else:
-                            st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
+                        if render_failed:
+                            # Filter out the "Welcome" message to show the actual error
+                            clean_message = render_message.replace("Welcome to RenderCV! Some useful links:", "").strip()
+                            clean_message = re.sub(r'https?://\S+', '', clean_message)
+                            
+                            # If we have retries left and an API key, try to fix it with AI
+                            if attempt <= max_retries and api_key:
+                                st.warning(f"PDF generation failed. Attempting AI Auto-Fix (Attempt {attempt}/{max_retries})...")
+                                fixed_yaml = fix_yaml_with_ai(yaml_string, clean_message, api_key)
+                                if fixed_yaml:
+                                    yaml_string = fixed_yaml
+                                    st.session_state.yaml_for_editing = fixed_yaml # Update editor
+                                    st.success("AI applied a fix. Retrying generation...")
+                                    continue # Retry loop
+                                else:
+                                    st.error("AI Auto-Fix could not resolve the issue.")
+                            
                             st.session_state.pdf_bytes = None
-                            if os.path.exists(output_file_path):
-                                st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
+                            st.error("RenderCV could not generate the PDF. See details below:")
+                            
+                            if clean_message:
+                                st.code(clean_message, language="text")
+                            else:
+                                st.error("Unknown error occurred in RenderCV.")
+                        else:
+                            # 3. Check if the file was created and is not empty
+                            if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:
+                                with open(output_file_path, "rb") as pdf_file:
+                                    st.session_state.pdf_bytes = pdf_file.read()
+                                success = True
+                            else:
+                                st.error("PDF generation via CLI function failed. The output file is missing, empty, or corrupt.")
+                                st.session_state.pdf_bytes = None
+                                if os.path.exists(output_file_path):
+                                    st.error(f"The file `{output_file_path}` was created but has a size of {os.path.getsize(output_file_path)} bytes.")
 
-                except Exception as e:
-                    st.error(f"An unexpected error occurred during PDF generation: {e}")
-                    st.session_state.pdf_bytes = None
-                finally:
-                    # 4. Clean up the temporary YAML file
-                    if yaml_file_name and os.path.exists(yaml_file_name):
-                        os.remove(yaml_file_name)
+                    except Exception as e:
+                        st.error(f"An unexpected error occurred during PDF generation: {e}")
+                        st.session_state.pdf_bytes = None
+                    finally:
+                        # 4. Clean up the temporary YAML file
+                        if yaml_file_name and os.path.exists(yaml_file_name):
+                            os.remove(yaml_file_name)
     
     # Display the PDF if it exists in the session state
     if st.session_state.pdf_bytes:
@@ -647,7 +780,12 @@ if st.session_state.yaml_for_editing:
             st.error("YAML resume and job description are required to generate a cover letter.")
         else:
             with st.spinner("Generating your tailored cover letter..."):
-                cover_letter = generate_cover_letter(st.session_state.yaml_for_editing, job_description, api_key)
+                cover_letter = generate_cover_letter(
+                    st.session_state.yaml_for_editing,
+                    job_description,
+                    api_key,
+                    user_prompt=user_prompt or None,
+                )
                 if cover_letter:
                     st.session_state.cover_letter = cover_letter
                 else:
