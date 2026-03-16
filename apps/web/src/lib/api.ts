@@ -40,12 +40,15 @@ export interface GenerateRequest {
   user_instructions?: string | null;
   api_key?: string | null;
   model_name?: string | null;
+  review_mode?: boolean;
+  review_model?: string | null;
 }
 
 export interface GenerateResponse {
   cv_data: Record<string, unknown>;
   ats_issues: string[];
   hallucination_warnings: string[];
+  review_panel?: Record<string, unknown> | null;
 }
 
 export async function generateCV(body: GenerateRequest): Promise<GenerateResponse> {
@@ -69,6 +72,7 @@ export interface ModelsResponse {
   providers: Record<string, string[]>;
   available_providers: string[];
   default: string;
+  default_review_model: string;
 }
 
 export async function getModels(): Promise<ModelsResponse> {

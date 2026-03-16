@@ -39,6 +39,13 @@ interface AppState {
   selectedModel: string;
   setSelectedModel: (model: string) => void;
 
+  // ─── Review committee ──────────────────────────
+  reviewMode: boolean;
+  setReviewMode: (enabled: boolean) => void;
+
+  reviewModel: string;
+  setReviewModel: (model: string) => void;
+
   // ─── Generated CV ───────────────────────────────
   cvData: CV | null;
   setCvData: (data: CV | null) => void;
@@ -83,6 +90,8 @@ const initialState = {
   apiKey: "",
   uploadedFileNames: [] as string[],
   selectedModel: "",
+  reviewMode: false,
+  reviewModel: "",
   cvData: null as CV | null,
   atsIssues: [] as string[],
   hallucinationWarnings: [] as string[],
@@ -114,6 +123,9 @@ export const useAppStore = create<AppState>()((set) => ({
     })),
 
   setSelectedModel: (selectedModel) => set({ selectedModel }),
+
+  setReviewMode: (reviewMode) => set({ reviewMode }),
+  setReviewModel: (reviewModel) => set({ reviewModel }),
 
   setCvData: (cvData) => set({ cvData }),
   setAtsIssues: (atsIssues) => set({ atsIssues }),

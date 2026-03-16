@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-AI-powered resume tailoring app. Upload resume + job description → AI generates a tailored CV → PDF export. Monorepo: Next.js 16 frontend (React 19, Tailwind 4) + FastAPI backend (Pydantic AI, LiteLLM).
+AI-powered resume tailoring app. Upload resume + job description → AI generates a tailored CV → PDF export. Monorepo: Next.js 16 frontend (React 19, Tailwind 4) + FastAPI backend (Pydantic AI, LiteLLM). Backend supports two generation modes: standard (single-agent) and review committee (multi-agent with parallel HR/Technical/ATS reviewers + synthesis).
 
 ## STRUCTURE
 
@@ -26,7 +26,10 @@ career-flow/
 |------|----------|-------|
 | Add API endpoint | `backend/app/api/` | FastAPI router, register in `main.py` |
 | Add AI agent | `backend/app/agents/` | Uses pydantic-ai structured output |
+| Add reviewer agent | `backend/app/agents/` | Follow hr_reviewer.py pattern, register in `pipeline.py` |
+| Change pipeline flow | `backend/app/agents/pipeline.py` | Orchestrates standard and review modes |
 | Modify CV schema | `backend/app/schemas/cv.py` + `packages/shared/src/cv.ts` | Keep in sync manually |
+| Modify review schemas | `backend/app/schemas/review.py` | ReviewMemo, HallucinationReport, ReviewPanelResult |
 | Add UI component | `apps/web/src/components/` | Custom components here; `ui/` is shadcn |
 | Add shadcn primitive | `apps/web/src/components/ui/` | Use `npx shadcn@latest add <component>` |
 | Modify state | `apps/web/src/lib/store.ts` | Zustand flat store, no slices |

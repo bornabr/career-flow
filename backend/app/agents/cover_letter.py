@@ -6,11 +6,11 @@ from pydantic_ai import Agent
 from app.services.llm import create_model_from_string
 
 COVER_LETTER_SYSTEM_PROMPT = (
-    "You are an expert career coach and professional writer. Your goal is to write compelling, "
-    "personalized cover letters that complement a candidate's CV for a specific job posting. "
-    "You must NEVER hallucinate or invent information. Only reference experiences, skills, and "
-    "achievements that are present in the provided CV data. Write in a professional but natural tone — "
-    "avoid generic filler phrases and clichés."
+    "You are a senior career coach and executive-level cover letter specialist. "
+    "You write persuasive, role-specific cover letters that complement the CV rather than repeating it line-by-line. "
+    "Your writing must translate CV evidence into a coherent candidacy story for a specific role. "
+    "Anti-hallucination is absolute: never invent, infer, embellish, or generalize beyond provided CV data and optional user instructions. "
+    "Use a concrete, professional voice; avoid cliches, fluff, and generic templates."
 )
 
 
@@ -54,46 +54,88 @@ def _build_cover_letter_prompt(
     user_instructions: str | None = None,
 ) -> str:
     """Build the user prompt for cover letter generation."""
-    company_section = ""
-    if company_name:
-        company_section = f"**Company Name**: {company_name}\n\n"
-
-    user_section = ""
-    if user_instructions:
-        user_section = f"**Additional Instructions**:\n{user_instructions}\n\n"
-
-    # Format CV data as readable text for the prompt
-    name = cv_data.get("name", "the candidate")
+    company_section = f"**Company Name**: {company_name}\n\n" if company_name else ""
+    user_section = f"**Additional Instructions**:\n{user_instructions}\n\n" if user_instructions else ""
     sections = cv_data.get("sections", {})
 
-    summary = " ".join(sections.get("Summary", []))
-    experience_lines = []
+    def _section_text(lines: list[str]) -> str:
+        return chr(10).join(lines) if lines else "- Not provided"
+
+    social_lines = [
+        f"- {n.get('network', '')}: {n.get('username', '')} ({n.get('url', '')})"
+        for n in cv_data.get("social_networks", [])
+    ]
+    summary_lines = [f"- {line}" for line in sections.get("Summary", [])]
+    skills_lines = [f"- {s.get('label', '')}: {s.get('details', '')}" for s in sections.get("Skills", [])]
+
+    experience_lines: list[str] = []
     for exp in sections.get("Experience", []):
-        role = f"{exp.get('position', '')} at {exp.get('company', '')}"
-        highlights = "; ".join(exp.get("highlights", []))
-        experience_lines.append(f"- {role}: {highlights}")
+        experience_lines.append(
+            f"- Company: {exp.get('company', '')} | Position: {exp.get('position', '')} | "
+            f"Location: {exp.get('location', '')} | Dates: {exp.get('start_date', '')} to {exp.get('end_date', '')}"
+        )
+        if exp.get("summary"):
+            experience_lines.append(f"  Summary: {exp.get('summary', '')}")
+        if exp.get("highlights"):
+            experience_lines.append(f"  Highlights: {'; '.join(exp.get('highlights', []))}")
 
-    skills_lines = []
-    for skill in sections.get("Skills", []):
-        skills_lines.append(f"- {skill.get('label', '')}: {skill.get('details', '')}")
+    education_lines = [
+        f"- {e.get('degree', '')} in {e.get('area', '')} | {e.get('institution', '')} | "
+        f"{e.get('start_date', '')} to {e.get('end_date', '')}"
+        for e in sections.get("Education", [])
+    ]
 
-    cv_text = f"""Name: {name}
-Summary: {summary}
+    project_lines: list[str] = []
+    for p in sections.get("PersonalProjects", []) or []:
+        project_lines.append(f"- {p.get('name', '')}: {p.get('summary', '')}")
+        if p.get("highlights"):
+            project_lines.append(f"  Highlights: {'; '.join(p.get('highlights', []))}")
+
+    publication_lines = [
+        f"- {p.get('title', '')} | Journal: {p.get('journal', '')}"
+        for p in sections.get("Publications", []) or []
+    ]
+
+    cv_text = f"""Name: {cv_data.get('name', 'the candidate')}
+Location: {cv_data.get('location', '')}
+Email: {cv_data.get('email', '')}
+Phone: {cv_data.get('phone', '')}
+Website: {cv_data.get('website', '')}
+
+Social Networks:
+{_section_text(social_lines)}
+
+Summary:
+{_section_text(summary_lines)}
 
 Experience:
-{chr(10).join(experience_lines)}
+{_section_text(experience_lines)}
 
 Skills:
-{chr(10).join(skills_lines)}"""
+{_section_text(skills_lines)}
+
+Education:
+{_section_text(education_lines)}
+
+Personal Projects:
+{_section_text(project_lines)}
+
+Publications:
+{_section_text(publication_lines)}"""
 
     return f"""Write a professional cover letter for the following candidate and job posting.
 
+Craft a compelling story of fit. Complement the CV by interpreting evidence and motivation, not by repeating bullet points.
+
 **CRITICAL RULES:**
-1. Only reference experiences, skills, and achievements present in the CV data below.
-2. Do NOT invent or exaggerate any information.
-3. Keep the letter concise — aim for 250-350 words total.
-4. Match the tone and language of the job description.
-5. Highlight 2-3 specific achievements from the CV that directly address key job requirements.
+1. Anti-hallucination is mandatory: reference only facts explicitly present in the CV data below.
+2. Never invent achievements, technologies, dates, credentials, responsibilities, or outcomes.
+3. Connect 2-3 concrete CV achievements to specific job-description requirements.
+4. Match tone and formality to the job posting.
+5. Opening must name the target role and one standout CV-backed qualification.
+6. Body paragraphs must use concise STAR mini-narratives from CV experience.
+7. Closing must include a specific call to action tied to role priorities.
+8. Keep total length between 250 and 350 words.
 
 {company_section}{user_section}**Candidate CV Data**:
 {cv_text}

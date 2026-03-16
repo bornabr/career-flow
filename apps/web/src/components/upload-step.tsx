@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 const ACCEPTED_FILE_TYPES = ".pdf,.docx,.png,.jpg,.jpeg,.webp,.txt";
@@ -32,6 +33,8 @@ export function UploadStep() {
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
+  const [defaultReviewModel, setDefaultReviewModel] = useState("");
+  const [reviewProvider, setReviewProvider] = useState("");
 
   const {
     jobDescription,
@@ -44,6 +47,10 @@ export function UploadStep() {
     setUploadedFileNames,
     selectedModel,
     setSelectedModel,
+    reviewMode,
+    setReviewMode,
+    reviewModel,
+    setReviewModel,
     setResumeText,
     setCvData,
     setAtsIssues,
@@ -64,8 +71,8 @@ export function UploadStep() {
         setProviders(data.providers);
         setAvailableProviders(data.available_providers);
         setDefaultModel(data.default);
+        setDefaultReviewModel(data.default_review_model ?? "");
 
-        // Extract provider from default model (e.g., "google" from "google:gemini-2.5-pro")
         const defaultProvider = data.default.includes(":")
           ? data.default.split(":")[0]
           : "openai";
@@ -76,6 +83,13 @@ export function UploadStep() {
           } else if (data.available_providers.length > 0) {
             setSelectedProvider(data.available_providers[0]);
           }
+        }
+
+        const defaultRevProvider = data.default_review_model?.includes(":")
+          ? data.default_review_model.split(":")[0]
+          : "";
+        if (!reviewProvider && defaultRevProvider) {
+          setReviewProvider(defaultRevProvider);
         }
       })
       .catch(() => {
@@ -143,6 +157,8 @@ export function UploadStep() {
         user_instructions: userInstructions.trim() || null,
         api_key: apiKey.trim() || null,
         model_name: modelToSend,
+        review_mode: reviewMode,
+        review_model: reviewModel || null,
       });
 
       setCvData(generated.cv_data as unknown as CV);
@@ -164,6 +180,7 @@ export function UploadStep() {
     ? Object.keys(providers)
     : availableProviders.filter((p) => p in providers);
   const modelsForProvider = selectedProvider ? providers[selectedProvider] ?? [] : [];
+  const reviewModelsForProvider = reviewProvider ? providers[reviewProvider] ?? [] : [];
 
   return (
     <Card className="w-full">
@@ -367,6 +384,77 @@ export function UploadStep() {
                   placeholder="Example: Prioritize achievements with measurable impact and keep tone concise."
                   disabled={isBusy}
                 />
+              </div>
+
+              {/* ─── Review Committee ───────────────────────── */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="review-mode" className="text-sm font-medium">Review committee</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Run parallel HR, Technical, and ATS reviewers on the generated CV, then synthesize feedback into a refined version.
+                    </p>
+                  </div>
+                  <Switch
+                    id="review-mode"
+                    checked={reviewMode}
+                    onCheckedChange={setReviewMode}
+                    disabled={isBusy}
+                  />
+                </div>
+
+                {reviewMode && providerNames.length > 0 && (
+                  <div className="grid gap-4 pt-2 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Review provider</Label>
+                      <Select
+                        value={reviewProvider}
+                        onValueChange={(value) => {
+                          if (value) {
+                            setReviewProvider(value);
+                            setReviewModel("");
+                          }
+                        }}
+                        disabled={isBusy}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {providerNames.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p === "google" ? "Google (Gemini)" : p === "openai" ? "OpenAI" : p === "anthropic" ? "Anthropic" : p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Review model</Label>
+                      <Select
+                        value={reviewModel ? reviewModel.split(":").pop() ?? "" : ""}
+                        onValueChange={(value) => {
+                          if (value) {
+                            setReviewModel(`${reviewProvider}:${value}`);
+                          }
+                        }}
+                        disabled={isBusy || !reviewProvider}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={defaultReviewModel ? `Default: ${defaultReviewModel.split(":").pop()}` : "Select model"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {reviewModelsForProvider.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

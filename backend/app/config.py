@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     # LLM Provider
     model_name: str = "google:gemini-2.5-pro"
+    # Default model for reviewer agents (HR, Technical, ATS) — typically a fast/cheap model
+    default_review_model: str = "google:gemini-2.5-flash"
     api_key: str = ""
     gemini_api_key: str = ""
     openai_api_key: str = ""

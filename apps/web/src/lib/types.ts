@@ -113,6 +113,7 @@ export function createEmptyExperience(): ExperienceEntry {
     start_date: "",
     end_date: "",
     highlights: [""],
+    summary: "",
   };
 }
 
@@ -125,6 +126,7 @@ export function createEmptyEducation(): EducationEntry {
     start_date: "",
     end_date: "",
     highlights: [],
+    summary: "",
   };
 }
 

@@ -210,6 +210,7 @@ export function CVEditor() {
                 <div className="space-y-2"><Label>Start date</Label><Input value={experience.start_date ?? ""} onChange={(event) => updateExperienceField(index, "start_date", event.target.value)} /></div>
                 <div className="space-y-2"><Label>End date</Label><Input value={experience.end_date ?? ""} onChange={(event) => updateExperienceField(index, "end_date", event.target.value)} /></div>
               </div>
+              <div className="space-y-2"><Label>Summary</Label><Textarea className="min-h-16" value={experience.summary ?? ""} onChange={(event) => updateExperienceField(index, "summary", event.target.value)} placeholder="Brief role summary (optional)" /></div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between"><Label className="text-sm font-semibold">Highlights</Label><Button variant="outline" onClick={() => updateCv((current) => ({ ...current, sections: { ...current.sections, Experience: current.sections.Experience.map((item, i) => i === index ? { ...item, highlights: [...item.highlights, ""] } : item) } }))}>+ Add bullet</Button></div>
                 {experience.highlights.map((highlight, hIndex) => (
@@ -249,6 +250,7 @@ export function CVEditor() {
                 <div className="space-y-2"><Label>Start date</Label><Input value={education.start_date ?? ""} onChange={(event) => updateEducationField(index, "start_date", event.target.value)} /></div>
                 <div className="space-y-2"><Label>End date</Label><Input value={education.end_date ?? ""} onChange={(event) => updateEducationField(index, "end_date", event.target.value)} /></div>
               </div>
+              <div className="space-y-2"><Label>Summary</Label><Textarea className="min-h-16" value={education.summary ?? ""} onChange={(event) => updateEducationField(index, "summary", event.target.value)} placeholder="Brief education summary (optional)" /></div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between"><Label className="text-sm font-semibold">Highlights</Label><Button variant="outline" onClick={() => updateCv((current) => ({ ...current, sections: { ...current.sections, Education: current.sections.Education.map((item, i) => i === index ? { ...item, highlights: [...ensureArray(item.highlights), ""] } : item) } }))}>+ Add bullet</Button></div>
                 {ensureArray(education.highlights).map((highlight, hIndex) => (

@@ -1,4 +1,11 @@
+"""Document parsing service — extract text from uploaded files.
+
+Supports PDF (PyMuPDF fast path + Docling OCR fallback), DOCX, images, and plain text.
+Includes post-extraction text normalization and source labeling for multi-document pipelines.
+"""
+
 import logging
+import re
 from io import BytesIO
 
 import fitz
@@ -21,6 +28,9 @@ SUPPORTED_CONTENT_TYPES = {
     "text/plain": None,
 }
 
+# Minimum characters for a valid extraction (avoids near-empty results)
+_MIN_TEXT_LENGTH = 50
+
 
 def _get_converter() -> DocumentConverter:
     global _converter
@@ -37,20 +47,53 @@ def _get_converter() -> DocumentConverter:
     return _converter
 
 
+def _normalize_text(text: str) -> str:
+    """Clean up extracted text for downstream LLM consumption.
+
+    - Collapse 3+ consecutive newlines into 2
+    - Strip trailing whitespace per line
+    - Remove null bytes and control characters (except newline/tab)
+    - Normalize unicode whitespace to ASCII space
+    """
+    # Remove null bytes and non-printable control chars (keep \n, \t)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+
+    # Normalize unicode whitespace (non-breaking space, etc.) to regular space
+    text = re.sub(r"[\u00a0\u2000-\u200b\u202f\u205f\u3000]", " ", text)
+
+    # Strip trailing whitespace per line
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+
+    # Collapse 3+ consecutive blank lines into 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
+
+
 def _parse_with_pymupdf(file_bytes: bytes) -> str:
+    """Extract text from PDF using PyMuPDF + pymupdf4llm (fast, text-layer PDFs)."""
     doc = fitz.open(stream=file_bytes, filetype="pdf")
-    text = pymupdf4llm.to_markdown(doc)
-    doc.close()
-    if not text or len(text.strip()) < 50:
+    try:
+        text = pymupdf4llm.to_markdown(doc)
+    finally:
+        doc.close()
+    if not text or len(text.strip()) < _MIN_TEXT_LENGTH:
         raise ValueError("PyMuPDF extracted insufficient text — likely scanned PDF")
     return text
 
 
 def _parse_with_docling(file_bytes: bytes, filename: str) -> str:
+    """Extract text using Docling (OCR-capable, handles scanned docs and images)."""
     converter = _get_converter()
     stream = DocumentStream(name=filename, stream=BytesIO(file_bytes))
     result = converter.convert(stream)
-    return result.document.export_to_markdown()
+    text = result.document.export_to_markdown()
+    if not text or len(text.strip()) < _MIN_TEXT_LENGTH:
+        raise ValueError(
+            f"Docling extracted insufficient text from '{filename}'. "
+            "The file may be empty, corrupted, or contain only images without recognizable text."
+        )
+    return text
 
 
 def parse_document(file_bytes: bytes, content_type: str, filename: str) -> str:
@@ -60,21 +103,61 @@ def parse_document(file_bytes: bytes, content_type: str, filename: str) -> str:
     - Plain text: decode directly
     - PDF: try PyMuPDF (fast) first, fall back to Docling (OCR-capable)
     - DOCX/Images: use Docling directly
+
+    Returns normalized text with a source label header for multi-document pipelines.
+
+    Raises:
+        ValueError: If the file type is unsupported or extraction yields insufficient text.
     """
     if content_type not in SUPPORTED_CONTENT_TYPES:
+        supported_list = ", ".join(SUPPORTED_CONTENT_TYPES.keys())
         raise ValueError(
-            f"Unsupported file type: {content_type}. "
-            f"Supported: {', '.join(SUPPORTED_CONTENT_TYPES.keys())}"
+            f"Unsupported file type: {content_type}. Supported: {supported_list}"
         )
 
     if content_type == "text/plain":
-        return file_bytes.decode("utf-8")
-
-    if content_type == "application/pdf":
         try:
-            return _parse_with_pymupdf(file_bytes)
-        except Exception as e:
-            logger.info("PyMuPDF fallback failed (%s), using Docling", e)
-            return _parse_with_docling(file_bytes, filename)
+            raw_text = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            raw_text = file_bytes.decode("utf-8", errors="replace")
+            logger.warning("Non-UTF-8 characters in '%s' replaced during decoding", filename)
+    elif content_type == "application/pdf":
+        try:
+            raw_text = _parse_with_pymupdf(file_bytes)
+        except Exception as exc:
+            logger.info("PyMuPDF failed for '%s' (%s), falling back to Docling", filename, exc)
+            raw_text = _parse_with_docling(file_bytes, filename)
+    else:
+        raw_text = _parse_with_docling(file_bytes, filename)
 
-    return _parse_with_docling(file_bytes, filename)
+    normalized = _normalize_text(raw_text)
+
+    if len(normalized) < _MIN_TEXT_LENGTH:
+        raise ValueError(
+            f"Extracted text from '{filename}' is too short ({len(normalized)} chars). "
+            "The file may be empty or contain only non-text content."
+        )
+
+    return normalized
+
+
+def parse_documents(
+    files: list[tuple[bytes, str, str]],
+) -> str:
+    """Parse multiple documents and combine with source labels.
+
+    Args:
+        files: List of (file_bytes, content_type, filename) tuples.
+
+    Returns:
+        Combined text with source labels separating each document:
+        ``--- Source: resume.pdf ---``
+        ``[extracted text]``
+        ``--- Source: portfolio.pdf ---``
+        ``[extracted text]``
+    """
+    parts: list[str] = []
+    for file_bytes, content_type, filename in files:
+        text = parse_document(file_bytes, content_type, filename)
+        parts.append(f"--- Source: {filename} ---\n{text}")
+    return "\n\n".join(parts)
