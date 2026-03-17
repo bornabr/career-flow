@@ -819,3 +819,117 @@ P2.2-P2.10 will add streaming components and streaming tests.
 - ✅ Module docstring explains event schema and usage pattern
 
 **Next task:** P2.3 will import and use these helpers in graph nodes to emit progress events.
+
+## [2026-03-16] Task: P2.3 - Update Graph Nodes for Event Emission
+
+**Completed successfully** ✅
+
+### Changes Made
+
+**File modified:** `backend/app/graph/nodes_generation.py` (240 lines total)
+
+#### Imports Added
+```python
+from langgraph.config import get_stream_writer
+from app.graph.events import (
+    emit_review_failed,
+    emit_review_memo,
+    emit_step_completed,
+    emit_step_started,
+    emit_validation_completed,
+)
+```
+
+#### Pattern Applied to All 7 Nodes
+
+**Standard Node Pattern (5 nodes: tailor, hallucination_check, synthesis, validate, etc.):**
+```python
+async def {node_name}_node(state, config):
+    writer = get_stream_writer()
+    emit_step_started(writer, "step_name")
+    
+    # ... existing logic unchanged ...
+    
+    emit_step_completed(writer, "step_name")
+    return {...}
+```
+
+**Reviewer Node Pattern (3 nodes: hr_review, technical_review, ats_review):**
+```python
+async def {reviewer}_review_node(state, config):
+    writer = get_stream_writer()
+    emit_step_started(writer, "{reviewer}_review")
+    
+    try:
+        review = await review_as_{reviewer}(...)
+        emit_review_memo(writer, "{reviewer}", review.model_dump())
+        emit_step_completed(writer, "{reviewer}_review")
+        return {"reviews": [review]}
+    except Exception as exc:
+        logger.error(...)
+        emit_review_failed(writer, "{reviewer}", str(exc))
+        # NO emit_step_completed on failure
+        return {"review_errors": [...]}
+```
+
+### Node-by-Node Changes
+
+1. **tailor_node** (lines 29-51)
+   - Emit: `step_started("generation")` → `step_completed("generation")`
+
+2. **hr_review_node** (lines 54-80)
+   - Success: emit_review_memo("hr", memo) + emit_step_completed
+   - Failure: emit_review_failed("hr", error)
+
+3. **technical_review_node** (lines 83-109)
+   - Success: emit_review_memo("technical", memo) + emit_step_completed
+   - Failure: emit_review_failed("technical", error)
+
+4. **ats_review_node** (lines 112-138)
+   - Success: emit_review_memo("ats", memo) + emit_step_completed
+   - Failure: emit_review_failed("ats", error)
+
+5. **hallucination_check_node** (lines 141-171)
+   - Emit: `step_started("hallucination_check")` → `step_completed("hallucination_check")`
+   - Graceful failure: still emits step_completed even on exception
+
+6. **synthesis_node** (lines 174-199)
+   - Emit: `step_started("synthesis")` → `step_completed("synthesis")`
+
+7. **validate_node** (lines 202-240)
+   - Emit: `step_started("validation")`
+   - Emit: `validation_completed(ats_issues, hallucination_warnings)` after validation
+   - Emit: `step_completed("validation")`
+
+### Implementation Details
+
+**Key Pattern Insights:**
+- Each node calls `writer = get_stream_writer()` at the beginning (LangGraph provides this in config)
+- Non-reviewer nodes always emit step_completed (even on error like hallucination_check)
+- Reviewer nodes emit memo on success OR failed on failure (mutually exclusive)
+- All events use `.model_dump()` to convert Pydantic ReviewMemo to dict before passing to emit_review_memo
+
+**`get_stream_writer()` Behavior:**
+- Returns no-op writer in non-streaming contexts (tests unaffected)
+- Returns actual SSE writer when using `graph.astream()`
+- Type: `Callable[[dict[str, Any]], None]` from langgraph.config
+
+**Backward Compatibility:**
+- No changes to node signatures or return values
+- No changes to state updates
+- Events are purely side effects (via stream writer)
+- Existing tests still pass (all 5 API tests ✅)
+
+### Verification Results
+
+✅ **All imports work:** `python -c "from app.graph.nodes_generation import *"`
+✅ **All tests pass:** 5/5 tests in test_generate_api.py passed
+✅ **Graph tests:** 14/14 skipped (as expected, not implemented yet)
+✅ **LSP diagnostics:** Pre-existing type warnings only (not new errors)
+
+### Ready for P2.4
+
+This change enables the next task (P2.4: Create SSE endpoint) because:
+- Nodes now emit events to the stream writer
+- Events flow through the graph's event stream
+- P2.4 will create the endpoint to consume these events via `astream()`
