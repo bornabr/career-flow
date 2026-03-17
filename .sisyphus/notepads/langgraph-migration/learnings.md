@@ -933,3 +933,101 @@ This change enables the next task (P2.4: Create SSE endpoint) because:
 - Nodes now emit events to the stream writer
 - Events flow through the graph's event stream
 - P2.4 will create the endpoint to consume these events via `astream()`
+
+## [2026-03-16 23:52] Task: P2.4 - SSE Streaming Endpoint
+
+### Files Created
+
+**File: `backend/app/api/sse.py`** (77 lines)
+- `format_sse(data: dict[str, Any]) -> str` — Formats data as SSE frame: `data: {json}\n\n`
+- `stream_generation(state, config, graph) -> AsyncIterator[str]` — Async generator consuming graph events
+
+### Files Modified
+
+**File: `backend/app/api/generate.py`** (added imports + POST route)
+- Imports added: `Form`, `StreamingResponse`, `stream_generation`, `get_generation_graph`, `GraphRuntimeConfig`, `GenerationState`, `uuid`
+- New endpoint: `POST /api/generate/stream` (145 lines)
+
+### Implementation Details
+
+#### SSE Format Standard
+
+```
+data: {"type": "run.started", "timestamp": "...", "data": {...}}\n\n
+```
+
+Each event:
+- Prefixed with `data: `
+- Followed by JSON object
+- Terminated with `\n\n` (two newlines)
+
+#### `stream_generation()` Pattern
+
+Wraps `graph.astream(state, config, stream_mode=["custom", "updates"])`:
+- Consumes chunks with type `"custom"` (from get_stream_writer())
+- Formats each as SSE frame via `format_sse()`
+- Yields SSE strings for FastAPI StreamingResponse consumption
+- Error handling: emits error event, doesn't crash stream
+
+#### `POST /api/generate/stream` Endpoint
+
+Request body: **Form data (same as /api/generate, plus optional thread_id)**
+- resume_text (required)
+- job_description (required)
+- user_instructions (optional)
+- review_mode (bool, default False)
+- run_hallucination_check (bool, default False)
+- model_name (optional, uses server default)
+- api_key (optional, resolves from env)
+- review_model_name (optional, uses server default)
+- review_api_key (optional, resolves from env)
+- **thread_id (new)** — Optional session persistence/resuming
+
+Response: `StreamingResponse` with:
+- Media type: `text/event-stream`
+- Headers:
+  - `Cache-Control: no-cache`
+  - `Connection: keep-alive`
+  - `X-Accel-Buffering: no` (disable nginx buffering for real-time)
+
+#### Implementation Pattern
+
+1. Resolve model names and API keys (same as blocking endpoint)
+2. Generate unique thread_id if not provided: `uuid.uuid4()`
+3. Build GenerationState dict
+4. Build GraphRuntimeConfig with resolved model/key
+5. Build config dict with `{"configurable": {"thread_id": ..., "runtime": ...}}`
+6. Get compiled graph: `get_generation_graph()`
+7. Return `StreamingResponse(stream_generation(state, config, graph), media_type="text/event-stream", headers={...})`
+
+### Verification Completed
+
+✅ **Imports work:**
+- `poetry run python -c "from app.api.sse import format_sse, stream_generation"`
+- `poetry run python -c "from app.api.generate import generate_cv_stream"`
+
+✅ **Routes registered:**
+- `/api/generate` ✓
+- `/api/generate/stream` ✓
+
+✅ **Backend starts:**
+- `poetry run python -c "from app.main import app"` ✓
+
+✅ **LSP diagnostics:**
+- Type warnings only (normal for LangGraph/FastAPI dynamic typing)
+- No errors in new code
+
+### Key Design Patterns Established
+
+1. **SSE format is wire-level only**: Events are emitted as structured JSON with ISO timestamps, formatted as SSE on wire
+2. **Error handling in stream_generation**: Exceptions logged but formatted as error events (stream doesn't crash)
+3. **Optional thread_id for multi-turn**: Session persistence enabled at API layer (graph already supports via config["configurable"]["thread_id"])
+4. **Same model resolution as blocking endpoint**: Reused `_resolve_api_key()` pattern
+
+### Ready for P2.5-P2.6
+
+P2.4 enables:
+- P2.5: Write backend streaming tests
+- P2.6: Frontend SSE client component
+- P2.7: Frontend progress indicators consuming SSE events
+

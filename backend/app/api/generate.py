@@ -6,13 +6,19 @@ Supports two modes:
 """
 
 import logging
+import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.agents.pipeline import generate_cv_standard, generate_cv_with_review
+from app.api.sse import stream_generation
 from app.config import get_settings, AVAILABLE_MODELS
+from app.graph.registry import get_generation_graph
+from app.graph.runtime import GraphRuntimeConfig
+from app.graph.state import GenerationState
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +129,101 @@ async def generate_cv(request: GenerateRequest):
     )
 
 
-@router.get("/models")
+@router.post("/generate/stream")
+async def generate_cv_stream(
+    resume_text: str = Form(...),
+    job_description: str = Form(...),
+    user_instructions: str | None = Form(None),
+    review_mode: bool = Form(False),
+    run_hallucination_check: bool = Form(False),
+    model_name: str | None = Form(None),
+    api_key: str | None = Form(None),
+    review_model_name: str | None = Form(None),
+    review_api_key: str | None = Form(None),
+    thread_id: str | None = Form(None),
+):
+    """Stream CV generation progress via Server-Sent Events.
+    
+    Same functionality as /api/generate but returns real-time progress events
+    instead of blocking until completion. Frontend uses EventSource or fetch
+    to consume the text/event-stream response.
+    
+    Args:
+        resume_text: Resume text input
+        job_description: Target job description
+        user_instructions: Optional custom instructions from user
+        review_mode: Enable review committee pipeline
+        run_hallucination_check: Enable AI hallucination validation
+        model_name: Model for generation (e.g., 'google:gemini-2.5-pro')
+        api_key: Optional API key override
+        review_model_name: Optional model for reviewers
+        review_api_key: Optional API key override for review model
+        thread_id: Optional thread ID for session persistence/resuming
+        
+    Returns:
+        StreamingResponse with text/event-stream media type
+    """
+    settings = get_settings()
+    
+    # Resolve main model
+    resolved_model = model_name or settings.model_name
+    provider = resolved_model.split(":")[0] if ":" in resolved_model else "openai"
+    resolved_api_key = _resolve_api_key(settings, provider, api_key)
+    
+    # Optional review model resolution
+    if review_mode:
+        resolved_review_model = review_model_name or settings.default_review_model
+        review_provider = resolved_review_model.split(":")[0] if ":" in resolved_review_model else "openai"
+        resolved_review_api_key = _resolve_api_key(settings, review_provider, review_api_key)
+    else:
+        resolved_review_model = None
+        resolved_review_api_key = None
+    
+    # Generate unique thread_id if not provided
+    if not thread_id:
+        thread_id = str(uuid.uuid4())
+    
+    # Build initial state
+    state: GenerationState = {
+        "request_id": thread_id,
+        "resume_text": resume_text,
+        "job_description": job_description,
+        "user_instructions": user_instructions,
+        "review_mode": review_mode,
+        "run_hallucination_check": run_hallucination_check,
+    }
+    
+    # Build runtime config
+    runtime = GraphRuntimeConfig(
+        model_name=resolved_model,
+        api_key=resolved_api_key,
+        review_model_name=resolved_review_model,
+        review_api_key=resolved_review_api_key,
+    )
+    
+    # Build graph config
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "runtime": runtime,
+        }
+    }
+    
+    # Get graph and stream
+    graph = get_generation_graph()
+    
+    return StreamingResponse(
+        stream_generation(state, config, graph),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+
 async def get_models():
     """Return available LLM models grouped by provider.
 
