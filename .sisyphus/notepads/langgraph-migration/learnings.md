@@ -1174,3 +1174,106 @@ P2.5 enables:
 - P2.7: Frontend progress indicators consuming SSE events
 - Confidence that backend streaming is robust and tested
 
+
+## [2026-03-16 22:27] Task: P2.6 - Frontend SSE Client
+
+### Files Created
+
+1. **`apps/web/src/lib/sse.ts`** (58 lines)
+   - `parseSSE(response: Response, handlers: EventHandlers): Promise<void>`
+   - `SSEEvent` interface with `{type, timestamp, data}` structure
+   - `EventHandlers` interface with optional handler methods for all 9 event types
+
+2. **`apps/web/src/lib/__tests__/sse.test.ts`** (593 lines, 23 tests)
+   - Comprehensive test suite covering all event types and edge cases
+
+### Implementation Details
+
+#### SSE Parsing Algorithm
+
+**Key insight from bug discovery:**
+- Initial approach split on `\n\n` first, then checked if chunk starts with `data:`
+- This failed because SSE blocks can have multiple lines:
+  ```
+  event: step
+  id: 123
+  data: {"type": "step.started", ...}
+  ```
+- After split on `\n\n`, this became one string not starting with `data:`
+
+**Corrected algorithm:**
+1. Split response text on `\n\n` to separate event blocks
+2. For each block, skip if empty/whitespace-only
+3. Split each block on `\n` to get individual lines
+4. For each line, check if it starts with `data: ` (exact prefix required)
+5. Extract JSON from position 6 onward (after `data: `)
+6. Parse JSON and invoke appropriate handler based on `event.type` field
+
+**Handler mapping:**
+- Event type `"run.started"` → handler key `"onRunStarted"` (CamelCase transformation)
+- Event type `"step.started"` → handler key `"onStepStarted"`
+- Pattern: split type on `.`, capitalize each part, join, prepend `on`
+
+#### Error Handling
+
+- Invalid JSON caught via try-catch, logged but doesn't crash stream
+- Missing handlers silently ignored (no error thrown)
+- Empty lines/blocks gracefully skipped
+- Incomplete events (no trailing `\n\n`) still parsed if valid
+
+### Test Coverage (23/23 passing)
+
+**Single event tests (9):**
+- ✅ All 9 event types parse correctly (run.started, step.started, step.completed, review.memo, review.failed, validation.completed, result, error, run.completed)
+- ✅ Each calls correct handler with event.data
+
+**Multiple event tests (3):**
+- ✅ Sequential events in correct order
+- ✅ Multiple reviewers (3 review.memo events)
+- ✅ Mixed event types with different handlers
+
+**Error handling tests (6):**
+- ✅ Empty event blocks skipped
+- ✅ Multi-line blocks with non-data lines ignored
+- ✅ Invalid JSON logged and skipped (stream continues)
+- ✅ Missing handlers don't crash
+- ✅ Empty streams handled gracefully
+- ✅ Whitespace-only streams handled gracefully
+- ✅ Incomplete events (no trailing `\n\n`) still parsed
+
+**Handler invocation tests (2):**
+- ✅ Event data passed to handler correctly
+- ✅ Complex nested data structures preserved
+
+**Type correctness tests (2):**
+- ✅ Response objects accepted
+- ✅ Partial EventHandlers (optional properties) work
+
+### Verification Results
+
+✅ **All 23 vitest tests passing**
+✅ **TypeScript type-check passes** (`npx tsc --noEmit`)
+✅ **No LSP errors in sse.ts or sse.test.ts**
+
+### Key Design Decisions
+
+1. **Split on both `\n\n` and `\n`**: Handles SSE spec multi-line event blocks correctly
+2. **Line-by-line processing**: Only parse lines with `data:` prefix, ignore event/id/retry/comment fields
+3. **Handler naming convention**: Type `"x.y"` → handler `"onXY"` via automatic CamelCase transformation
+4. **Graceful degradation**: Errors logged but don't stop parsing remaining events
+5. **Optional handlers**: Callers only provide handlers they need; missing ones are no-ops
+
+### Integration with P2.7-P2.10
+
+This module enables:
+- P2.7: Extend API client with `streamGenerateCV(body, handlers)` using `parseSSE()`
+- P2.8: Extend Zustand store for streaming state (tracking event emissions)
+- P2.9: Progress indicators consuming event handlers
+- P2.10: Cancellation support via AbortController
+
+### Gotchas Encountered
+
+1. **SSE format complexity**: RFC 7118 allows multi-line event blocks with optional fields. Initial implementation assumed one JSON per `\n\n` block.
+2. **Handler naming edge case**: Event type with multiple dots (unlikely but handled): split, capitalize, join handles arbitrary nesting.
+3. **Whitespace handling**: Empty lines after split become empty strings; `.trim()` check prevents processing them.
+
