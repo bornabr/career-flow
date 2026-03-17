@@ -1,3 +1,5 @@
+import { parseSSE, EventHandlers } from "./sse";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ─── Parse ───────────────────────────────────────────────
@@ -64,6 +66,24 @@ export async function generateCV(body: GenerateRequest): Promise<GenerateRespons
   }
 
   return res.json();
+}
+
+export async function streamGenerateCV(
+  body: GenerateRequest,
+  handlers: EventHandlers
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/generate/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to generate CV (streaming)");
+  }
+
+  await parseSSE(res, handlers);
 }
 
 // ─── Models ──────────────────────────────────────────────

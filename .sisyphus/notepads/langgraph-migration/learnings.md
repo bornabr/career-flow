@@ -1277,3 +1277,85 @@ This module enables:
 2. **Handler naming edge case**: Event type with multiple dots (unlikely but handled): split, capitalize, join handles arbitrary nesting.
 3. **Whitespace handling**: Empty lines after split become empty strings; `.trim()` check prevents processing them.
 
+
+## [2026-03-16] Task: P2.7 - Extend API Client for Streaming
+
+### Files Modified
+
+**File: `apps/web/src/lib/api.ts`** (194 lines)
+
+#### Import Added
+```typescript
+import { parseSSE, EventHandlers } from "./sse";
+```
+
+#### Function Added
+```typescript
+export async function streamGenerateCV(
+  body: GenerateRequest,
+  handlers: EventHandlers
+): Promise<void>
+```
+
+### Implementation Details
+
+**Endpoint:** `POST ${API_BASE}/api/generate/stream`
+
+**Pattern Applied:**
+- Follows existing api.ts conventions (API_BASE, error handling, fetch usage)
+- Uses same `GenerateRequest` body interface as blocking generateCV()
+- Accepts `EventHandlers` map for consuming streaming events
+- Returns Promise<void> — result comes via onResult handler callback
+
+**Error Handling:**
+- Checks `response.ok` before parsing
+- Converts error response to message: `await res.json().catch(...)`
+- Throws with descriptive message: "Failed to generate CV (streaming)"
+- Same pattern as all other api.ts functions
+
+**Success Path:**
+- POST to `/api/generate/stream` with JSON body
+- Call `parseSSE(response, handlers)` to consume event stream
+- parseSSE handles all event type routing to appropriate handlers
+- No manual event parsing needed in API client
+
+**Type Safety:**
+- EventHandlers interface imported from "./sse" (co-located with parseSSE)
+- Handlers are optional (partial handler maps supported)
+- GenerateRequest reused from line 37 (no duplication)
+
+### Verification
+
+✅ Type-check passes: `pnpm type-check` (web app)
+✅ No new dependencies added
+✅ Follows existing api.ts patterns byte-for-byte
+✅ LSP: No errors or warnings in api.ts
+
+### Integration Pattern (for P2.8+)
+
+**Usage in components:**
+```typescript
+await streamGenerateCV(requestBody, {
+  onRunStarted: (data) => console.log("Started", data),
+  onStepStarted: (data) => updateUI("step", data),
+  onReviewMemo: (data) => addReview(data),
+  onResult: (data) => setFinalCV(data),
+  onError: (data) => showError(data),
+  onCompleted: (data) => finalize(),
+})
+```
+
+### Design Rationale
+
+1. **Same request body as blocking endpoint**: Reuse GenerateRequest, no new types needed
+2. **Handlers passed at call time**: Consumers decide which events to handle
+3. **parseSSE handles routing**: No duplication of event type parsing in api.ts
+4. **Promise<void> return type**: Result comes via onResult handler (not return value)
+5. **Error handling consistent with api.ts**: Same pattern for all endpoints
+
+### Next Steps (P2.8)
+
+- Update cv-editor component to use streamGenerateCV
+- Add real-time progress indicators consuming event handlers
+- Update store to support streaming state transitions
+
