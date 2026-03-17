@@ -699,3 +699,76 @@ compiled_graph.invoke(initial_state, config={"configurable": {"runtime": ...}})
 - Add `/api/generate/stream` endpoint
 - Real-time progress events via Server-Sent Events
 - Frontend SSE client with progress indicators
+
+## [2026-03-16 23:50] Task: P2.1 - Frontend Test Tooling
+
+### Dependencies Added
+
+**File modified:** `apps/web/package.json`
+
+**devDependencies added:**
+```json
+"vitest": "^2.1.9",
+"@testing-library/react": "^16.3.2",
+"@testing-library/user-event": "^14.6.1",
+"@testing-library/jest-dom": "^6.9.1",
+"jsdom": "^25.0.1",
+"@vitejs/plugin-react": "^4.7.0"
+```
+
+**Test scripts added:**
+```json
+"test": "vitest",
+"test:ui": "vitest --ui",
+"test:run": "vitest run"
+```
+
+### Config Pattern: vitest.config.ts
+
+**File created:** `apps/web/vitest.config.ts`
+
+- React plugin (`@vitejs/plugin-react`) for JSX transformation
+- jsdom environment for DOM testing
+- setupFiles pointing to `src/test/setup.ts`
+- globals enabled for describe/it/expect
+- Path aliases matching tsconfig (`@/*` → `./src/*`)
+
+**Key impl detail:** Must explicitly configure path aliases in vitest — it doesn't read from tsconfig automatically.
+
+### Test Setup Pattern: src/test/setup.ts
+
+**File created:** `apps/web/src/test/setup.ts`
+
+- Imports `@testing-library/jest-dom` for custom matchers (toBeVisible, toBeInTheDocument, etc.)
+- Minimal setup file — custom utilities can be added here as needed
+
+### Installation Verification
+
+```bash
+✓ cd apps/web && pnpm install
+  - Installed 6 new devDependencies
+  - All dependencies resolved without conflicts
+  - Warning: Ignored build scripts (esbuild, msw, sharp, unrs) — expected behavior
+
+✓ npx vitest --version
+  - Output: vitest/2.1.9 darwin-arm64 node-v22.20.0
+  - Confirms vitest is available in PATH
+
+✓ pnpm build (from repo root via Turbo)
+  - Next.js build succeeds
+  - No breakage introduced
+  - TypeScript compilation passes
+```
+
+### Pattern: Frontend vs Backend Testing
+
+- **Backend**: pytest (Phase 1), tests located in `backend/tests/`
+- **Frontend**: vitest (Phase 2), tests will be co-located with components (e.g., `Button.test.tsx` next to `Button.tsx`)
+- Different test frameworks by design: pytest for async Python agents, vitest for React component testing
+
+### What's Next
+
+P2.2-P2.10 will add streaming components and streaming tests.
+- `pnpm test` will discover test files matching `**/*.{test,spec}.{ts,tsx}`
+- No test files exist yet — tooling ready to go
+
