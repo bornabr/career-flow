@@ -772,3 +772,50 @@ P2.2-P2.10 will add streaming components and streaming tests.
 - `pnpm test` will discover test files matching `**/*.{test,spec}.{ts,tsx}`
 - No test files exist yet — tooling ready to go
 
+
+## [2026-03-16] Task: P2.2 - Backend Streaming Event Helpers
+
+**File created:** `backend/app/graph/events.py` (208 lines)
+
+**Event schema pattern (consistent across all 9 helpers):**
+```json
+{
+  "type": "event.name",
+  "timestamp": "ISO 8601 UTC",
+  "data": {...}
+}
+```
+
+**9 helper functions implemented:**
+1. `emit_run_started(writer, thread_id, review_mode)` - Type: "run.started"
+2. `emit_step_started(writer, step_name)` - Type: "step.started"
+3. `emit_step_completed(writer, step_name)` - Type: "step.completed"
+4. `emit_review_memo(writer, reviewer_role, memo)` - Type: "review.memo"
+5. `emit_review_failed(writer, reviewer_role, error)` - Type: "review.failed"
+6. `emit_validation_completed(writer, ats_issues, hallucination_warnings)` - Type: "validation.completed"
+7. `emit_result(writer, response)` - Type: "result"
+8. `emit_error(writer, message)` - Type: "error"
+9. `emit_run_completed(writer, thread_id, status)` - Type: "run.completed"
+
+**Key implementation patterns:**
+- Writer parameter typed as `Callable[[dict[str, Any]], None]` (not `Any`)
+- Timestamp helper `_now_iso()` returns ISO 8601 format via `datetime.now(UTC).isoformat()`
+- All events include UTC timestamp automatically (via _now_iso)
+- Data payloads are JSON-serializable dicts (no Pydantic models directly)
+- Writer is passed as parameter (NOT called via `get_stream_writer()` inside helpers)
+- Functions accept already-dumped dicts (callers use `.model_dump()` before passing)
+
+**Type hints strategy:**
+- Used `Callable[[dict[str, Any]], None]` instead of `Any` for writer parameter
+- All payloads use `dict[str, Any]` for flexibility
+- Proper return type hints `-> None` on all functions
+- Type warnings about `Any` in generic types are acceptable/normal
+
+**Verification completed:**
+- ✅ File created at correct path
+- ✅ All 9 functions have docstrings and type hints
+- ✅ lsp_diagnostics shows only benign type warnings (not errors)
+- ✅ Python syntax valid (`python3 -m py_compile`)
+- ✅ Module docstring explains event schema and usage pattern
+
+**Next task:** P2.3 will import and use these helpers in graph nodes to emit progress events.
