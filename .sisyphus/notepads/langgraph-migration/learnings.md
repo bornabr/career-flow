@@ -1031,3 +1031,146 @@ P2.4 enables:
 - P2.6: Frontend SSE client component
 - P2.7: Frontend progress indicators consuming SSE events
 
+
+## [2026-03-16 21:30] Task: P2.5 - Backend Streaming Tests
+
+### Files Created
+
+1. **`backend/tests/api/test_generate_stream_api.py`** (7 tests)
+   - Tests SSE endpoint behavior and response format
+   - Verifies HTTP headers, content-type, cache-control
+   - Tests streaming in both standard and review modes
+   - Error handling and partial failure scenarios
+
+2. **`backend/tests/graph/test_stream_events.py`** (19 tests)
+   - Tests all 8 event helper functions
+   - Tests node event emission with mocked stream writer
+   - Tests reviewer success and failure paths
+   - Tests parallel reviewer independence
+
+### Test Patterns Discovered
+
+#### SSE Endpoint Testing
+
+**Challenge:** Mocking LangGraph astream() returns tuples `(node_name, chunk)`, not direct dicts.
+
+**Solution:** Use node-level mocking instead of graph mocking:
+```python
+patch("app.graph.nodes_generation.tailor_cv", new_callable=AsyncMock)
+patch("app.graph.nodes_generation.validate_cv")
+```
+
+**Header Handling:**
+- FastAPI adds `; charset=utf-8` to `text/event-stream` content-type
+- Solution: Use substring match: `assert "text/event-stream" in response.headers["content-type"]`
+
+#### Event Helper Testing
+
+**Pattern 1: Direct Testing**
+```python
+def test_emit_step_started_structure(mock_writer):
+    emit_step_started(mock_writer, "generation")
+    
+    assert len(mock_writer.events) == 1
+    event = mock_writer.events[0]
+    assert event["type"] == "step.started"
+    assert "timestamp" in event
+    assert event["data"]["step_name"] == "generation"
+```
+
+**Pattern 2: Mock Writer Fixture**
+```python
+@pytest.fixture
+def mock_writer():
+    events = []
+    def writer_func(event):
+        events.append(event)
+    writer_func.events = events
+    return writer_func
+```
+
+**Pattern 3: Node Event Testing**
+```python
+with patch("app.graph.nodes_generation.get_stream_writer", return_value=mock_writer), \
+     patch("app.graph.nodes_generation.tailor_cv", new_callable=AsyncMock) as mock_tailor:
+    
+    mock_tailor.return_value = sample_cv
+    await tailor_node(state, mock_config)
+    
+    # Verify events were emitted
+    assert len(mock_writer.events) == 2
+```
+
+### Test Coverage Summary
+
+**SSE Endpoint Tests (7 tests):**
+- ✅ Returns valid event stream response
+- ✅ SSE format compliance (data: {...}\n\n)
+- ✅ Review mode with multiple reviewers
+- ✅ Continues after reviewer failure
+- ✅ Error handling emits error events
+- ✅ Correct HTTP headers set
+- ✅ Stream completes successfully
+
+**Event Emission Tests (19 tests):**
+- ✅ emit_step_started structure
+- ✅ emit_step_completed structure
+- ✅ emit_review_memo structure
+- ✅ emit_review_failed structure
+- ✅ emit_validation_completed structure
+- ✅ emit_result structure
+- ✅ emit_error structure
+- ✅ emit_run_started structure
+- ✅ emit_run_completed structure
+- ✅ ISO 8601 timestamp format validation
+- ✅ tailor_node emits lifecycle events
+- ✅ hr_review_node success path
+- ✅ hr_review_node failure path (emits review.failed, not step.completed)
+- ✅ technical_review_node success path
+- ✅ ats_review_node success path
+- ✅ validate_node emits validation.completed
+- ✅ hallucination_check_node emits step events
+- ✅ synthesis_node emits step events
+- ✅ Parallel reviewers emit independent events
+
+**Total: 26 tests, all passing**
+
+### Key Insights
+
+1. **Event Structure Verification**: All events must have `{type, timestamp, data}` structure
+2. **Reviewer Failure Pattern**: On failure, nodes emit `review.failed` WITHOUT `step.completed`
+3. **Success Pattern**: On success, nodes emit `step.started` → `event-specific` → `step.completed`
+4. **Timestamp Format**: Events use ISO 8601 UTC format from `datetime.now(UTC).isoformat()`
+5. **Parallel Safety**: Reviewers can be tested independently by mocking get_stream_writer per call
+
+### SSE Parser Utility
+
+```python
+def parse_sse_events(response_text: str) -> list[dict]:
+    """Parse SSE response into list of event dicts."""
+    events = []
+    for chunk in response_text.split('\n\n'):
+        if chunk.strip() and chunk.startswith('data: '):
+            event_json = chunk[6:]  # Remove 'data: ' prefix
+            try:
+                events.append(json.loads(event_json))
+            except json.JSONDecodeError:
+                pass
+    return events
+```
+
+### Verification Commands
+
+```bash
+cd backend
+poetry run pytest tests/api/test_generate_stream_api.py tests/graph/test_stream_events.py -v
+# ✅ 26 passed
+```
+
+### Ready for P2.6
+
+P2.5 enables:
+- P2.6: Frontend SSE client component
+- P2.7: Frontend progress indicators consuming SSE events
+- Confidence that backend streaming is robust and tested
+
