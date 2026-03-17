@@ -1424,3 +1424,11 @@ Store now supports SSE integration with:
 - Error state management (generationError)
 - Transport mode switching (generationTransport)
 
+
+## P2.9: Generation Progress Component
+- Created `GenerationProgress` component to visualize the CV generation pipeline state.
+- Leveraged Zustand store (`runStatus`, `activeStep`, `completedSteps`, `liveReviewMemos`, `generationError`) to drive the UI.
+- Used existing shadcn/ui components (`Card`, `Alert`) and `lucide-react` icons for a clean, consistent design.
+- Added comprehensive tests using Vitest and React Testing Library to ensure all states (idle, running, completed, failed) render correctly.
+- Installed missing `alert` component from shadcn/ui to fulfill the design requirements.
+
