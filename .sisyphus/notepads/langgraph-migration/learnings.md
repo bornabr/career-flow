@@ -1,0 +1,542 @@
+# LangGraph Migration - Learnings
+
+## P1.1: Test Harness Setup
+
+### Key Findings
+1. **PEP 621 Format**: Backend uses `pyproject.toml` with PEP 621 (not Poetry's `[tool.poetry]` format). Optional dependencies go in `[project.optional-dependencies]` section.
+2. **README Required**: Poetry install requires a README.md file even with `--no-root` when `readme` field is in `pyproject.toml`.
+3. **Version Constraints**: Keep version ranges flexible (e.g., `httpx (>=0.25.0,<1.0.0)`) instead of patch-specific to avoid dependency resolution conflicts. Initial `httpx (>=0.29.0,<0.30.0)` failed to resolve.
+4. **Poetry Lock**: Must run `poetry lock` before `poetry install -E dev` to update lock file when dependencies change.
+
+### What Was Created
+- `backend/pyproject.toml`: Added `langgraph (>=0.3.0,<0.4.0)` to dependencies and dev optional-dependencies group
+- `backend/tests/` directory structure:
+  - `conftest.py`: FastAPI TestClient fixture for endpoint testing
+  - `fixtures/mock_data.py`: Sample resume, job description, and expected CV outputs
+  - `graph/test_generation_graph.py`: Placeholder for LangGraph tests
+  - `api/test_generate_api.py`: Placeholder for endpoint tests
+- `backend/README.md`: Minimal project readme (required by Poetry)
+
+### Test Discovery Verification
+```
+✓ Poetry collected 2 tests
+✓ Test files properly discovered via pytest
+✓ Placeholder tests marked with @pytest.mark.skip
+```
+
+### Commands That Work
+```bash
+cd backend
+poetry lock  # Update lock with new dependencies
+poetry install -E dev --no-root  # Install with dev extras
+poetry run pytest --collect-only  # Verify test discovery
+```
+
+### Next Steps (P1.2)
+- Mock LangGraph generation graph structure
+- Implement node stubs (review agents, synthesis)
+- Write integration tests for graph execution
+
+## [2026-03-16 11:45] Task: P1.1 Complete
+
+**What worked:**
+- Poetry dependency management clean (no conflicts)
+- pytest discovery works with test structure: `tests/{api,graph,fixtures}/`
+- Mock data pattern: realistic resume, JD, expected CV output with contact/experience/skills
+- Test client fixture pattern: `@pytest.fixture` for FastAPI TestClient
+
+**Import path fix:**
+- In `backend/tests/conftest.py`, import path is `from app.main import app` NOT `from backend.app.main import app`
+- Python path is set correctly by pytest/poetry to treat `backend/` as root
+
+**Test structure created:**
+- `tests/conftest.py` — FastAPI TestClient fixture
+- `tests/fixtures/mock_data.py` — SAMPLE_RESUME, SAMPLE_JOB_DESCRIPTION, SAMPLE_CV_OUTPUT
+- `tests/api/test_generate_api.py` — Placeholder for endpoint tests
+- `tests/graph/test_generation_graph.py` — Placeholder for graph tests
+
+**Dependencies added:**
+- `langgraph = ">=0.3.0,<0.4.0"` (main dependency)
+- Dev extras: pytest 8.4.2, pytest-asyncio 0.25.3, httpx 0.29.7
+
+**Verification passed:**
+- `poetry run pytest --collect-only` → 2 tests discovered
+- Import paths verified with direct Python import test
+
+## P1.2: Comprehensive Regression Tests for Current Pipeline
+
+### Key Findings
+
+#### Mock Strategy
+1. **Function-level mocking**: Mock individual async functions in `app.agents.pipeline` module (e.g., `tailor_cv`, `review_as_hr`, `synthesize_cv`) using `unittest.mock.patch`
+2. **AsyncMock usage**: All mocked functions must return `AsyncMock()` to handle async/await correctly
+3. **Return type validation**: Mock objects must match actual return types:
+   - `tailor_cv()` → `CV` Pydantic model
+   - `review_as_hr|technical|ats()` → `ReviewMemo` Pydantic model
+   - `synthesize_cv()` → `CV` Pydantic model
+   - `validate_cv()` → dict with keys: `cv_data`, `ats_issues`, `hallucination_warnings`
+   - `check_hallucinations_ai()` → `HallucinationReport` Pydantic model
+
+#### Test Structure
+1. **Fixture pattern**: Use `@pytest.fixture` to create reusable mock objects (CV, ReviewMemos, HallucinationReport)
+2. **CV object creation**: Use `CV.model_validate({...})` to create valid Pydantic objects from dicts
+3. **Patching context managers**: Use `with patch(...) as mock_...` to patch multiple functions in one test
+4. **Client fixture**: TestClient from conftest.py provides `client` fixture for POST requests to `/api/generate`
+
+#### Pipeline Behavior Contracts
+1. **Standard mode** (`review_mode=false`):
+   - Flow: `tailor_cv()` → `validate_cv()`
+   - No reviewers called
+   - Response: `review_panel=None`
+
+2. **Review mode - all succeed** (`review_mode=true`, all 3 reviewers pass):
+   - Flow: `tailor_cv()` → parallel `review_as_*()` → `synthesize_cv()` → `validate_cv()`
+   - Consensus score: `sum(scores) / len(reviews)`
+   - Synthesis IS called when reviews exist
+   - Response: `review_panel` with all 3 reviews + consensus_score
+
+3. **Review mode - partial failure** (e.g., 2 succeed, 1 fails):
+   - Failed reviewer raises exception (caught by `asyncio.gather(..., return_exceptions=True)`)
+   - Only successful reviews are used: `len(reviews) == 2`
+   - Consensus score calculated from successful reviews only: `(8 + 9) / 2 = 8.5`
+   - Synthesis IS called (because reviews exist)
+   - Response includes only successful reviews
+
+4. **Review mode - all fail** (all 3 reviewers fail):
+   - All raise exceptions (caught by return_exceptions=True)
+   - `reviews == []` (empty list)
+   - Consensus score = 0.0
+   - Synthesis IS NOT called (no reviews to synthesize from)
+   - Original draft CV used (not refined)
+   - Response: `review_panel` with empty reviews list
+
+5. **Hallucination check**:
+   - Runs in parallel with reviewers
+   - Failure is logged but doesn't stop pipeline (graceful degradation)
+   - If fails: `hallucination_report=None` in response
+   - If succeeds: `hallucination_report` included in response
+
+#### Patch Targets (Import Paths)
+- `app.agents.pipeline.tailor_cv` — not `app.agents.tailor.tailor_cv`
+- `app.agents.pipeline.review_as_hr` — not `app.agents.hr_reviewer.review_as_hr`
+- `app.agents.pipeline.review_as_technical` — not `app.agents.technical_reviewer.review_as_technical`
+- `app.agents.pipeline.review_as_ats` — not `app.agents.ats_reviewer.review_as_ats`
+- `app.agents.pipeline.synthesize_cv` — not `app.agents.synthesis.synthesize_cv`
+- `app.agents.pipeline.validate_cv` — not `app.agents.validator.validate_cv`
+- `app.agents.pipeline.check_hallucinations_ai` — not `app.agents.hallucination_checker.check_hallucinations_ai`
+
+All imports in `pipeline.py` are aliased at module level, so patching must target the pipeline module imports.
+
+### What Was Created
+
+**File: `backend/tests/api/test_generate_api.py`**
+- 5 comprehensive test functions:
+  1. `test_standard_mode_success` — Standard pipeline with tailor + validate
+  2. `test_review_mode_all_reviewers_succeed` — All 3 reviewers pass, synthesis runs
+  3. `test_review_mode_partial_reviewer_failure` — 2 pass, 1 fails; consensus from 2
+  4. `test_review_mode_all_reviewers_fail` — All fail; synthesis skipped, draft returned
+  5. `test_generate_response_schema_validation` — Response conforms to GenerateResponse schema
+- All tests use `@pytest.mark.asyncio` decorator for async support
+- Tests mock all LLM agent calls at function level
+- Tests verify response structure using Pydantic deserialization
+
+**File: `backend/tests/graph/test_generation_graph.py`**
+- 14 test case stubs marked with `@pytest.mark.skip` for LangGraph implementation
+- Test cases cover:
+  - Successful standard path
+  - Successful review paths (all succeed, partial failures, total failure)
+  - Hallucination check edge cases (failure, detection)
+  - Output schema conformance (standard + review mode)
+  - Node behavior (Tailor, Synthesis, Validator)
+  - Async concurrency verification (reviewers parallel, review+hallucination parallel)
+- Each test case includes detailed docstring describing Given/Expected behavior
+
+### Fixtures Created
+
+**Mock objects (`@pytest.fixture`):**
+- `mock_cv` — Valid CV object with realistic structure
+- `mock_hr_review` — ReviewMemo from HR reviewer (score=8)
+- `mock_technical_review` — ReviewMemo from Technical reviewer (score=9)
+- `mock_ats_review` — ReviewMemo from ATS reviewer (score=7)
+- `mock_hallucination_report` — HallucinationReport with no hallucinations
+
+All fixtures properly typed and return Pydantic model instances.
+
+### Test Results
+
+```
+Platform: darwin, Python 3.13.5
+✓ 5 tests passed (test_generate_api.py)
+✓ 14 tests skipped (test_generation_graph.py - awaiting LangGraph)
+✓ Exit code: 0 (success)
+```
+
+Test discovery verified: pytest collects all 19 tests correctly.
+
+### Behavioral Contracts for LangGraph Migration
+
+The test cases in `test_generation_graph.py` define the exact behavioral contract that the LangGraph graph must satisfy:
+
+1. **Input contract**: resume_text, job_description, model_name, api_key, user_instructions, review_mode, review_model
+2. **Output contract**: GenerateResponse with cv_data, ats_issues, hallucination_warnings, review_panel
+3. **Node execution contract**: Tailor → (Review parallel + optional Hallucination) → Synthesis (optional) → Validate
+4. **Error handling contract**: Reviewer/hallucination failures are logged, don't stop pipeline
+5. **Consensus calculation contract**: `sum(scores) / len(reviews)` rounded to 1 decimal
+6. **Synthesis condition contract**: Only run if reviews exist (len > 0)
+7. **Schema conformance contract**: All outputs must deserialize to Pydantic models
+
+## [2026-03-16 12:30] Task: P1.2 Complete
+
+**What worked:**
+- Mock strategy is clean and maintainable: patch at `app.agents.pipeline` import level
+- Fixture pattern for complex mock objects (CV, ReviewMemo) is reusable
+- Pydantic `model_validate()` ensures mock objects are strictly typed
+- Test parametrization not needed — each scenario is distinct and warrants its own test
+- Context managers for multiple patches keep setup clean and readable
+
+**Key insights:**
+- `asyncio.gather(..., return_exceptions=True)` is the critical orchestration pattern — exceptions are returned as BaseException objects in the results list
+- Consensus score calculation must use ONLY successful reviews (not divide by 3 when one fails)
+- Synthesis is conditional on having any reviews at all — this is a critical edge case
+- Hallucination check failure must be graceful (failure doesn't stop pipeline)
+
+**Import path gotcha:**
+- Patch paths must target the `pipeline.py` module imports, not the original agent modules
+- `from app.agents.tailor import tailor_cv` at top of pipeline.py means patch target is `app.agents.pipeline.tailor_cv`
+
+**Next steps for LangGraph migration:**
+- Graph nodes must respect error handling: use try-except and handle BaseException objects from parallel tasks
+- Graph should replicate asyncio.gather behavior: collect all results, filter exceptions, continue
+- Graph conditional edges: only route to Synthesis if reviews exist
+- Graph output must match exact schema from GenerateResponse (cv_data structure, ats_issues format, etc.)
+
+
+## [2026-03-16 20:35] Task: P1.3 & P1.4 - LangGraph State Schema & Runtime Config
+
+### P1.3: GenerationState TypedDict
+
+**What was created:**
+- File: `backend/app/graph/state.py`
+- TypedDict with 15 fields matching plan specification exactly
+- Uses `Annotated[list[ReviewMemo], operator.add]` and `Annotated[list[dict[str, str]], operator.add]` for list reducer fields
+
+**Key implementation details:**
+1. **TypedDict vs Pydantic**: TypedDict required (not BaseModel) because LangGraph's state management expects native Python typing, not Pydantic validation. This allows LangGraph to apply custom reducers via Annotated.
+2. **Reducer pattern**: `operator.add` reducer on `reviews` and `review_errors` fields tells LangGraph to APPEND list elements when multiple nodes update state, not replace. Critical for parallel reviewer agents that each add to the reviews list.
+3. **Field classification**:
+   - Required: request_id, resume_text, job_description, review_mode, run_hallucination_check
+   - Optional (None-safe): user_instructions, draft_cv, current_cv_dict, hallucination_report, review_panel, validation_result, final_response
+   - Accumulator: reviews, review_errors (with operator.add reducers)
+4. **Import path**: `from app.graph.state import GenerationState` (not backend.app)
+
+**Why this design:**
+- State flows through nodes as a dict-like object, nodes read/write fields
+- Reducers prevent explicit merge logic in nodes (LangGraph handles merge automatically)
+- Keeping secrets out of state (GraphRuntimeConfig does that) prevents checkpoint leaks
+
+### P1.4: GraphRuntimeConfig Dataclass
+
+**What was created:**
+- File: `backend/app/graph/runtime.py`
+- Simple dataclass with 4 fields: model_name, api_key, review_model_name (optional), review_api_key (optional)
+- No validation (intentional) — used as a data container passed at runtime
+
+**Why dataclass (not TypedDict or Pydantic):**
+1. **Lifetime**: Created fresh per request, never persisted → no checkpoint exposure risk
+2. **Simplicity**: Just holds secrets, no schema validation needed
+3. **Explicit intent**: Dataclass signals "this is a value object, not graph state"
+
+**How it's used (future):**
+- Created from request headers/config
+- Passed via `RunnableConfig["configurable"]["runtime"]` to graph.invoke()
+- Nodes extract model_name + api_key to initialize LLM calls
+- Never written to graph state → never in checkpoints
+
+**Verification:**
+```
+✓ import app.graph.state.GenerationState
+✓ import app.graph.runtime.GraphRuntimeConfig
+✓ export from app.graph.__init__.py works
+```
+
+### Files Created
+1. `backend/app/graph/__init__.py` — Exports GenerationState, GraphRuntimeConfig
+2. `backend/app/graph/state.py` — GenerationState TypedDict (15 fields, 2 reducers)
+3. `backend/app/graph/runtime.py` — GraphRuntimeConfig dataclass (4 fields)
+
+### Commands That Work
+```bash
+cd backend
+poetry run python -c "from app.graph.state import GenerationState"  # ✓
+poetry run python -c "from app.graph.runtime import GraphRuntimeConfig"  # ✓
+poetry run python -c "from app.graph import GenerationState, GraphRuntimeConfig"  # ✓
+```
+
+### Next Steps (P1.5)
+- Implement graph builder with StateGraph(GenerationState)
+- Create node functions (tailor, review_hr, review_technical, review_ats, etc.)
+- Implement conditional routing and parallelization
+
+## [2026-03-16 21:15] Task: P1.5 - LangGraph Node Wrappers
+
+### What Was Created
+
+**File: `backend/app/graph/nodes_generation.py`**
+- 7 async node functions wrapping existing pydantic-ai agents
+- Each node follows LangGraph pattern: `async def node_name(state: GenerationState, config: RunnableConfig) -> dict[str, Any]`
+
+### Node Implementations
+
+1. **tailor_node**: Wraps `tailor_cv` agent
+   - Extracts runtime config: `runtime = config["configurable"]["runtime"]`
+   - Calls: `tailor_cv(resume_text, job_description, model_name, api_key, user_instructions)`
+   - Returns: `{"draft_cv": cv, "current_cv_dict": cv.model_dump(mode="json")}`
+   - Sets initial CV for pipeline
+
+2. **hr_review_node**: Wraps `review_as_hr` agent (with error handling)
+   - Extracts runtime config, uses fallback: `review_model_name or model_name`
+   - Try-except wraps agent call
+   - Success: `{"reviews": [review]}`
+   - Failure: `{"review_errors": [{"reviewer": "hr", "error": str(exc)}]}`
+
+3. **technical_review_node**: Wraps `review_as_technical` agent (with error handling)
+   - Same pattern as HR reviewer
+   - Failure returns `{"review_errors": [{"reviewer": "technical", "error": str(exc)}]}`
+
+4. **ats_review_node**: Wraps `review_as_ats` agent (with error handling)
+   - Same pattern as HR reviewer
+   - Failure returns `{"review_errors": [{"reviewer": "ats", "error": str(exc)}]}`
+
+5. **hallucination_check_node**: Wraps `check_hallucinations_ai` agent (graceful degradation)
+   - Try-except with non-blocking error handling
+   - Success: `{"hallucination_report": report}`
+   - Failure: returns `{}` (empty dict, no pipeline disruption)
+   - Logs error but doesn't stop execution
+
+6. **synthesis_node**: Wraps `synthesize_cv` agent
+   - Uses main model (not review model): `runtime.model_name, runtime.api_key`
+   - Calls: `synthesize_cv(current_cv_dict, reviews, resume_text, job_description, model_name, api_key)`
+   - Returns: `{"current_cv_dict": refined_cv.model_dump(mode="json")}`
+   - Conditional routing (only called if reviews exist)
+
+7. **validate_node**: Wraps `validate_cv` deterministic validator
+   - No runtime config extraction (no LLM calls)
+   - Calls: `validate_cv(current_cv_dict, resume_text)`
+   - Returns: `{"validation_result": result}`
+   - Final stage in both standard and review pipelines
+
+### Key Implementation Details
+
+**Import Paths Fixed:**
+- `RunnableConfig` comes from `langchain_core.runnables` (not `langgraph.graph`)
+- All agent imports from `app.agents.*` (not `app.agents.pipeline`)
+
+**Runtime Config Extraction Pattern (used in all nodes):**
+```python
+runtime: GraphRuntimeConfig = config["configurable"]["runtime"]
+```
+
+**Reviewer Fallback Pattern (HR, Technical, ATS):**
+```python
+review_model = runtime.review_model_name or runtime.model_name
+review_key = runtime.review_api_key or runtime.api_key
+```
+
+**Error Handling Strategy:**
+1. **Reviewers (HR, Tech, ATS)**: Try-except appends to `review_errors` — other reviewers continue
+2. **Hallucination checker**: Try-except returns empty dict — non-blocking graceful degradation
+3. **Tailor, Synthesis, Validate**: No try-except (critical path failures should surface)
+
+**Return Value Pattern (LangGraph State Merging):**
+- All nodes return dict with state updates
+- LangGraph applies reducers (e.g., `operator.add` for `reviews` list)
+- Never return None — return `{}` if nothing to update
+
+**State Field Access:**
+- `state["resume_text"]` — required, always present
+- `state["job_description"]` — required, always present
+- `state.get("user_instructions")` — optional, use .get()
+- `state["current_cv_dict"]` — populated by tailor_node, safe after first node
+- `state["reviews"]` — accumulator list, starts empty, reviewers append
+
+### Verification Commands
+
+```bash
+# Import all nodes
+poetry run python -c "from app.graph.nodes_generation import tailor_node, hr_review_node, technical_review_node, ats_review_node, hallucination_check_node, synthesis_node, validate_node; print('✓ All nodes imported')"
+
+# Check signatures
+poetry run python -c "import inspect; from app.graph.nodes_generation import tailor_node; print(inspect.signature(tailor_node))"
+```
+
+### Design Decisions
+
+1. **Separate reviewer nodes vs. gathered list**: Each reviewer is its own node rather than a single "reviewers" node. This allows LangGraph to parallelize them in a graph without manual asyncio.gather(). The graph builder will handle parallelization.
+
+2. **Error handling per reviewer**: Try-except in each reviewer node (not in orchestrator) keeps error handling close to the failure point and maintains clear state flow.
+
+3. **Hallucination check non-blocking failure**: Returns `{}` instead of raising or appending to review_errors. This is intentional — hallucination check is optional validation, not a critical reviewer. Failure shouldn't affect CV generation.
+
+4. **Synthesis uses main model, not review model**: Synthesis agent is the "chief editor" — uses the best model, not the cost-optimized review model. This maintains quality consistency in the refined output.
+
+5. **TypedDict vs. direct field access**: Nodes access state as dict (e.g., `state["field"]`) because TypedDict is structural typing — at runtime, state is a plain dict. Type checking is best-effort via LSP.
+
+### Connection to Graph Builder (Next: P1.6)
+
+These nodes will be added to StateGraph in `backend/app/graph/builder.py`:
+- `graph.add_node("tailor", tailor_node)`
+- `graph.add_node("hr_review", hr_review_node)` (and technical, ats)
+- `graph.add_node("hallucination_check", hallucination_check_node)`
+- `graph.add_node("synthesis", synthesis_node)`
+- `graph.add_node("validate", validate_node)`
+
+Conditional edges will route:
+- Tailor → conditional: if `review_mode` → Parallel(reviewers + hallucination) else → Validate
+- Reviewers → Synthesis (conditional: only if reviews exist)
+- Synthesis/Draft → Validate
+
+
+## [2026-03-16 22:00] Task: P1.6 - Build Generation Graph
+
+### What Was Created
+
+**File: `backend/app/graph/build_generation_graph.py`**
+- Function: `build_generation_graph() -> StateGraph`
+- 77 lines of code implementing complete graph structure
+
+### Graph Structure Implemented
+
+**All 7 nodes added:**
+1. `tailor` — generates initial CV draft
+2. `hr_review` — HR reviewer agent
+3. `technical_review` — Technical reviewer agent
+4. `ats_review` — ATS reviewer agent
+5. `hallucination_check` — AI hallucination detector
+6. `synthesis` — refines CV based on reviews
+7. `validate` — final deterministic validator
+
+**Plus 1 join node:**
+- `review_join` — no-op fan-in node for synchronization
+
+### Routing Functions Implemented
+
+1. **`route_after_tailor(state)`**
+   - Returns `list[Send]` if `review_mode=true` to fan out to HR, Technical, ATS reviewers (and optional hallucination check)
+   - Returns `"validate"` if `review_mode=false` to skip review pipeline
+
+2. **`route_after_review_join(state)`**
+   - Returns `"synthesis"` if any reviews exist (len > 0)
+   - Returns `"validate"` if no reviews collected (all failed or none ran)
+
+### Graph Flow Specification
+
+**Standard mode (review_mode=false):**
+```
+START → tailor → validate → END
+```
+
+**Review mode (review_mode=true):**
+```
+START → tailor → {Send to reviewers}
+                 ├─ hr_review ─┐
+                 ├─ technical_review ─┼─ review_join → (conditional)
+                 ├─ ats_review ─┘     ├─ synthesis → validate → END
+                 └─ hallucination_check (if enabled) ┘  (if reviews)
+                                          └─ validate → END (no reviews)
+```
+
+### Send API Implementation
+
+- Used `from langgraph.types import Send` for parallel execution
+- Fan-out function returns `list[Send(node_name, state)]` for conditional edges
+- LangGraph automatically triggers parallel execution from Send returns
+- All reviewer nodes route to `review_join` to synchronize completion
+
+### Conditional Edge Patterns
+
+**Pattern 1: String + Send returns mixed**
+```python
+def route_after_tailor(state) -> str | list[Send]:
+    if state["review_mode"]:
+        return [Send("hr_review", state), ...]  # Parallel execution
+    return "validate"  # Direct path
+
+graph.add_conditional_edges("tailor", route_after_tailor, {"validate": "validate"})
+```
+
+**Pattern 2: String returns only**
+```python
+def route_after_review_join(state) -> str:
+    if state["reviews"] and len(state["reviews"]) > 0:
+        return "synthesis"
+    return "validate"
+
+graph.add_conditional_edges("review_join", route_after_review_join, 
+    {"synthesis": "synthesis", "validate": "validate"})
+```
+
+### Verification Commands
+
+```bash
+# Import and create graph
+poetry run python -c "from app.graph.build_generation_graph import build_generation_graph; graph = build_generation_graph(); print('✓ Graph created')"
+
+# Compile and verify structure
+poetry run python -c "
+from app.graph.build_generation_graph import build_generation_graph
+graph = build_generation_graph()
+compiled = graph.compile()
+nodes = list(compiled.get_graph().nodes.keys())
+print('Nodes:', nodes)
+print('Total nodes:', len(nodes))  # Should be 10 (start, 7 graph nodes, review_join, end)
+"
+
+# Check edges
+poetry run python -c "
+from app.graph.build_generation_graph import build_generation_graph
+graph = build_generation_graph()
+compiled = graph.compile()
+for edge in compiled.get_graph().edges:
+    print(f'{edge.source} → {edge.target} (conditional: {edge.conditional})')
+"
+```
+
+### Graph Compilation Notes
+
+- `StateGraph.compile()` is required to generate the executable `CompiledGraph`
+- The Mermaid diagram (`draw_mermaid()`) only shows unconditional edges in visualization
+- Send API edges are properly configured but not visualized in Mermaid (LangGraph limitation)
+- All 9 nodes (7 generation nodes + review_join + implicit start/end = 10 total) are present in compiled graph
+
+### Key Design Decisions
+
+1. **Review_join as no-op**: Used async no-op instead of merging reviewers into a single node. This keeps the graph structure clean and lets LangGraph handle synchronization.
+
+2. **Send API for parallelization**: Instead of manual asyncio.gather in nodes, use Send to let LangGraph manage parallel execution. Simpler and more declarative.
+
+3. **Conditional routing after review_join**: Check if `len(reviews) > 0` to decide synthesis routing. This handles edge case where all reviewers fail.
+
+4. **Hallucination check conditional in fan-out**: Check `run_hallucination_check` flag during fan-out, not in a separate conditional edge. Keeps hallucination check synchronized with reviewers.
+
+### Integration Points (Next: P1.7)
+
+This graph will be wrapped in `backend/app/graph/registry.py`:
+```python
+def get_generation_graph(checkpointer=None) -> CompiledGraph:
+    graph = build_generation_graph()
+    return graph.compile(checkpointer=checkpointer)
+```
+
+The compiled graph will then be invoked via:
+```python
+compiled_graph.invoke(initial_state, config={"configurable": {"runtime": ...}})
+```
+
+### Gotchas Encountered
+
+1. **Mermaid diagram doesn't show Send edges**: The visualization limitation doesn't affect functionality. The edges are present and working.
+
+2. **TypedDict access without .get()**: LSP warns about accessing optional fields. Use `.get("field", default)` pattern to suppress warnings.
+
+3. **Mixed return types in routing functions**: When a conditional function returns either `str` or `list[Send]`, the mapping dict only needs entries for string returns. Send returns are handled automatically by LangGraph.
+
