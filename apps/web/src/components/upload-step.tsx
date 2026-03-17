@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, FileUp, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { parseDocuments, generateCV, getModels } from "@/lib/api";
+import { parseDocuments, generateCV, getModels, streamGenerateCV } from "@/lib/api";
 import type { CV } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
+import { GenerationProgress } from "@/components/generation-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,16 @@ export function UploadStep() {
     setIsParsing,
     isGenerating,
     setIsGenerating,
+    runStatus,
+    setRunStatus,
+    setGenerationTransport,
+    setActiveThreadId,
+    setActiveStep,
+    addCompletedStep,
+    clearCompletedSteps,
+    addLiveReviewMemo,
+    clearLiveReviewMemos,
+    setGenerationError,
   } = useAppStore();
 
   const isBusy = isParsing || isGenerating;
@@ -172,6 +183,88 @@ export function UploadStep() {
     } finally {
       setIsParsing(false);
       setIsGenerating(false);
+    }
+  };
+
+  const onGenerateWithProgress = async () => {
+    if (files.length === 0) {
+      toast.error("Please upload at least one document.");
+      return;
+    }
+
+    if (!jobDescription.trim()) {
+      toast.error("Please provide a job description.");
+      return;
+    }
+
+    try {
+      setIsParsing(true);
+      const parsed = await parseDocuments(files);
+      setResumeText(parsed.combined_text);
+      setUploadedFileNames(parsed.files.map((f) => f.filename));
+      setIsParsing(false);
+
+      clearCompletedSteps();
+      clearLiveReviewMemos();
+      setGenerationError(null);
+      setGenerationTransport("streaming");
+      setRunStatus("running");
+
+      const modelToSend = selectedModel || null;
+
+      await streamGenerateCV(
+        {
+          resume_text: parsed.combined_text,
+          job_description: jobDescription.trim(),
+          user_instructions: userInstructions.trim() || null,
+          api_key: apiKey.trim() || null,
+          model_name: modelToSend,
+          review_mode: reviewMode,
+          review_model: reviewModel || null,
+        },
+        {
+          onRunStarted: (data: any) => {
+            setActiveThreadId(data.thread_id);
+          },
+          onStepStarted: (data: any) => {
+            setActiveStep(data.step);
+          },
+          onStepCompleted: (data: any) => {
+            addCompletedStep(data.step);
+            setActiveStep(null);
+          },
+          onReviewMemo: (data: any) => {
+            addLiveReviewMemo(data);
+          },
+          onValidationCompleted: (data: any) => {
+            setAtsIssues(data.ats_issues);
+            setHallucinationWarnings(data.hallucination_warnings);
+          },
+          onResult: (data: any) => {
+            setCvData(data.cv_data as unknown as CV);
+            setRunStatus("completed");
+            setStep("edit");
+            toast.success("CV generated. You can now refine every section.");
+          },
+          onError: (data: any) => {
+            setGenerationError(data.error);
+            setRunStatus("failed");
+          },
+          onRunCompleted: (data: any) => {
+            if (data.success) {
+              setRunStatus("completed");
+            }
+          },
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate CV";
+      setGenerationError(message);
+      setRunStatus("failed");
+      toast.error(message);
+    } finally {
+      setIsParsing(false);
+      setGenerationTransport("blocking");
     }
   };
 
@@ -461,21 +554,39 @@ export function UploadStep() {
         </div>
 
         {/* ─── Generate Button ─────────────────────────────── */}
-        <Button onClick={onGenerate} disabled={isBusy} className="w-full sm:w-auto" size="lg">
-          {isParsing ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Parsing documents...
-            </>
-          ) : isGenerating ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Generating CV...
-            </>
-          ) : (
-            "Generate CV"
-          )}
-        </Button>
+        {runStatus !== "idle" && (
+          <div className="mb-6">
+            <GenerationProgress />
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button onClick={onGenerate} disabled={isBusy} size="lg" variant="outline" className="flex-1">
+            {isGenerating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              "Quick Generate"
+            )}
+          </Button>
+          <Button onClick={onGenerateWithProgress} disabled={isBusy} size="lg" className="flex-1">
+            {isParsing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Parsing...
+              </>
+            ) : runStatus === "running" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              "Generate with Live Progress"
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

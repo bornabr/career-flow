@@ -1432,3 +1432,10 @@ Store now supports SSE integration with:
 - Added comprehensive tests using Vitest and React Testing Library to ensure all states (idle, running, completed, failed) render correctly.
 - Installed missing `alert` component from shadcn/ui to fulfill the design requirements.
 
+
+### P2.10: Integrate streaming into upload step
+- Successfully integrated the `streamGenerateCV` function into the `UploadStep` component.
+- Added a new "Generate with Live Progress" button alongside the existing "Quick Generate" button.
+- Wired up the `GenerationProgress` component to display when `runStatus !== "idle"`.
+- Mapped SSE events (`onRunStarted`, `onStepStarted`, `onStepCompleted`, `onReviewMemo`, `onValidationCompleted`, `onResult`, `onError`, `onRunCompleted`) to the corresponding Zustand store actions.
+- Ensured the existing blocking generation flow remains intact and functional.
