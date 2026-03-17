@@ -540,3 +540,37 @@ compiled_graph.invoke(initial_state, config={"configurable": {"runtime": ...}})
 
 3. **Mixed return types in routing functions**: When a conditional function returns either `str` or `list[Send]`, the mapping dict only needs entries for string returns. Send returns are handled automatically by LangGraph.
 
+
+## [2026-03-16] Task: P1.7 - Graph Registry and Compilation
+
+**What was created:**
+- File: `backend/app/graph/registry.py`
+- Function: `get_generation_graph(checkpointer=None) -> CompiledStateGraph`
+
+**Implementation pattern:**
+- Calls `build_generation_graph()` to get uncompiled StateGraph
+- Uses `MemorySaver()` (formerly InMemorySaver) as default checkpointer (in-memory, non-persistent)
+- Compiles graph with `.compile(checkpointer=checkpointer)`
+- Returns compiled graph ready for execution
+
+**Checkpointer setup:**
+- MemorySaver from `langgraph.checkpoint.memory`
+- Default: in-memory dict storage, state lost on restart
+- Checkpointer instance is required to enable graph state persistence between invocations
+- Thread ID in config identifies checkpoint session (used in P1.8)
+- Phase 5 will swap to SqliteSaver for persistence
+
+**Import details:**
+- `CompiledStateGraph` is in `langgraph.graph.state`, NOT `langgraph.graph`
+- MemorySaver from `langgraph.checkpoint.memory`
+- Never import CompiledStateGraph from `langgraph.graph` (will fail with ImportError)
+
+**Integration points:**
+- P1.8 (pipeline.py) will call `get_generation_graph()` instead of building graph directly
+- Execution pattern: `graph.ainvoke(state, config={"configurable": {"thread_id": ..., "runtime": ...}})`
+
+**Verification:**
+✓ Import works: `from app.graph.registry import get_generation_graph`
+✓ Graph compiles: `graph = get_generation_graph(); assert graph is not None`
+✓ Checkpointer present: `graph.checkpointer` is InMemorySaver instance
+✓ Graph type: CompiledStateGraph
