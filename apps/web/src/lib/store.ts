@@ -5,6 +5,7 @@ import type {
   EducationEntry,
   OneLineEntry,
   PersonalProjectEntry,
+  ReviewMemo,
 } from "@/lib/types";
 
 // Re-export types from shared definitions for convenience
@@ -78,6 +79,32 @@ interface AppState {
   isLoadingPreview: boolean;
   setIsLoadingPreview: (v: boolean) => void;
 
+  // ─── Streaming state ────────────────────────────
+  generationTransport: "blocking" | "streaming";
+  setGenerationTransport: (transport: "blocking" | "streaming") => void;
+
+  activeThreadId: string | null;
+  setActiveThreadId: (id: string | null) => void;
+
+  runStatus: "idle" | "running" | "completed" | "failed";
+  setRunStatus: (status: "idle" | "running" | "completed" | "failed") => void;
+
+  activeStep: string | null;
+  setActiveStep: (step: string | null) => void;
+
+  completedSteps: string[];
+  setCompletedSteps: (steps: string[]) => void;
+  addCompletedStep: (step: string) => void;
+  clearCompletedSteps: () => void;
+
+  liveReviewMemos: ReviewMemo[];
+  setLiveReviewMemos: (memos: ReviewMemo[]) => void;
+  addLiveReviewMemo: (memo: ReviewMemo) => void;
+  clearLiveReviewMemos: () => void;
+
+  generationError: string | null;
+  setGenerationError: (error: string | null) => void;
+
   // ─── Reset ──────────────────────────────────────
   reset: () => void;
 }
@@ -101,6 +128,13 @@ const initialState = {
   isParsing: false,
   isGenerating: false,
   isLoadingPreview: false,
+  generationTransport: "blocking" as const,
+  activeThreadId: null as string | null,
+  runStatus: "idle" as const,
+  activeStep: null as string | null,
+  completedSteps: [] as string[],
+  liveReviewMemos: [] as ReviewMemo[],
+  generationError: null as string | null,
 };
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -144,6 +178,24 @@ export const useAppStore = create<AppState>()((set) => ({
   setIsParsing: (isParsing) => set({ isParsing }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setIsLoadingPreview: (isLoadingPreview) => set({ isLoadingPreview }),
+
+  setGenerationTransport: (generationTransport) => set({ generationTransport }),
+  setActiveThreadId: (activeThreadId) => set({ activeThreadId }),
+  setRunStatus: (runStatus) => set({ runStatus }),
+  setActiveStep: (activeStep) => set({ activeStep }),
+  setCompletedSteps: (completedSteps) => set({ completedSteps }),
+  addCompletedStep: (step) =>
+    set((state) => ({
+      completedSteps: [...state.completedSteps, step],
+    })),
+  clearCompletedSteps: () => set({ completedSteps: [] }),
+  setLiveReviewMemos: (liveReviewMemos) => set({ liveReviewMemos }),
+  addLiveReviewMemo: (memo) =>
+    set((state) => ({
+      liveReviewMemos: [...state.liveReviewMemos, memo],
+    })),
+  clearLiveReviewMemos: () => set({ liveReviewMemos: [] }),
+  setGenerationError: (generationError) => set({ generationError }),
 
   reset: () => set(initialState),
 }));

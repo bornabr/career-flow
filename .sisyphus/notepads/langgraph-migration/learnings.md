@@ -1359,3 +1359,68 @@ await streamGenerateCV(requestBody, {
 - Add real-time progress indicators consuming event handlers
 - Update store to support streaming state transitions
 
+
+## P2.8: Zustand Store Streaming State Extension
+
+**Date:** 2026-03-16
+**Task:** Extend Zustand store with streaming generation tracking fields
+
+### Pattern Findings
+
+1. **Zustand Flat Store Pattern Confirmed:**
+   - No slices, middleware, or complex abstractions
+   - Single `AppState` interface with flat field + setter structure
+   - Comment sections organize related fields: `// ─── Section ────────────`
+   - Follows setter naming: `fieldName` → `setFieldName`
+
+2. **Array Mutation Pattern:**
+   - Simple setters for replacement: `setCompletedSteps: (steps: string[]) => void`
+   - Append helpers for incremental updates: `addCompletedStep` using spread syntax
+   - Clear helpers for resetting: `clearCompletedSteps` 
+   - All use `set((state) => ({ ... }))` for accessing current state
+
+3. **Type Import Pattern:**
+   - ReviewMemo type needed for streaming state
+   - Added to `lib/types.ts` alongside CV, ExperienceEntry, etc.
+   - Imported in store.ts via `@/lib/types`
+
+### Implementation Details
+
+**ReviewMemo Type:**
+```typescript
+export interface ReviewMemo {
+  reviewer: string;        // hr, technical, ats reviewer names
+  score: number;          // Quality/match score
+  summary: string;        // Brief memo content
+  suggestions: string[];  // List of recommendations
+}
+```
+
+**Streaming State Fields Added:**
+- `generationTransport: "blocking" | "streaming"` (default: "blocking")
+- `activeThreadId: string | null` (default: null) — LangGraph thread ID
+- `runStatus: "idle" | "running" | "completed" | "failed"` (default: "idle")
+- `activeStep: string | null` (default: null) — Current pipeline step
+- `completedSteps: string[]` (default: []) — History of completed steps
+- `liveReviewMemos: ReviewMemo[]` (default: []) — Real-time reviewer feedback
+- `generationError: string | null` (default: null) — Error tracking
+
+**Setters Implemented (12 total):**
+- 7 simple setters for direct state replacement
+- 5 helpers (add/clear variants) for array mutations
+- All follow existing pattern: `set((state) => ({ ... }))` for computed updates
+
+### Verification
+- `pnpm type-check --force`: ✅ Passed (no errors)
+- All 7 fields initialized in `initialState`
+- All 12 setters implemented in store creation function
+- ReviewMemo properly typed and imported
+
+### Ready for P2.9
+Store now supports SSE integration with:
+- Thread ID tracking from run.started events
+- Step progression tracking (activeStep + completedSteps)
+- Real-time review memo collection (liveReviewMemos)
+- Error state management (generationError)
+- Transport mode switching (generationTransport)
+

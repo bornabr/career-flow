@@ -67,6 +67,13 @@ export interface CV {
   sections: Sections;
 }
 
+export interface ReviewMemo {
+  reviewer: string;
+  score: number;
+  summary: string;
+  suggestions: string[];
+}
+
 // ─── Helpers ─────────────────────────────────────
 
 export function createEmptyCV(): CV {
