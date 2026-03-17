@@ -574,3 +574,88 @@ compiled_graph.invoke(initial_state, config={"configurable": {"runtime": ...}})
 ✓ Graph compiles: `graph = get_generation_graph(); assert graph is not None`
 ✓ Checkpointer present: `graph.checkpointer` is InMemorySaver instance
 ✓ Graph type: CompiledStateGraph
+
+## [2026-03-16] Task: P1.8 - Refactor Pipeline to Use LangGraph
+
+**What was changed:**
+- File: `backend/app/agents/pipeline.py`
+- Replaced manual asyncio.gather orchestration with LangGraph graph.ainvoke()
+- Both functions now use `get_generation_graph()` factory
+
+**Refactoring pattern applied:**
+1. Generate unique request_id with uuid.uuid4()
+2. Build GenerationState from function inputs
+3. Build GraphRuntimeConfig with model/api_key (secrets not in state)
+4. Get compiled graph from registry
+5. Invoke: `result = await graph.ainvoke(state, config={"configurable": {"thread_id": request_id, "runtime": runtime}})`
+6. Extract final_response from result state
+7. Return final_response (preserves original API contract)
+
+**generate_cv_standard changes:**
+- review_mode=False, run_hallucination_check=False
+- No review model in runtime
+- Graph routes directly: tailor → validate
+- Returns dict with review_panel=None
+
+**generate_cv_with_review changes:**
+- review_mode=True, run_hallucination_check from parameter
+- Includes review_model_name and review_api_key in runtime
+- Graph routes: tailor → parallel reviewers → synthesis → validate
+- Returns dict with review_panel containing reviews + consensus_score
+
+**Code removed from pipeline.py:**
+- All asyncio.gather logic (lines 99-124 in original)
+- Direct agent calls (tailor_cv, review_as_*, synthesize_cv, validate_cv)
+- ReviewPanelResult construction (graph handles this now)
+- Consensus score calculation (graph handles this now in review_join)
+- Error handling loop for reviewers (graph nodes handle this)
+- asyncio import (no longer used)
+
+**Code modifications to graph layer:**
+- `build_generation_graph.py`: Updated review_join node to construct ReviewPanelResult
+  - Calculates consensus_score from reviews
+  - Combines reviews + hallucination_report into review_panel
+  - Returns dict with review_panel for state
+- `nodes_generation.py`: Updated validate_node to populate final_response
+  - Extracts review_panel from state
+  - Builds final_response dict matching original API contract
+  - Serializes review_panel to JSON if present
+
+**API contract verification:**
+- Standard mode: returns `{"cv_data": ..., "ats_issues": [...], "hallucination_warnings": [...], "review_panel": None}`
+- Review mode: returns `{"cv_data": ..., "ats_issues": [...], "hallucination_warnings": [...], "review_panel": {...}}`
+- Both modes return exact dict shape as before refactoring
+
+**Imports in refactored pipeline.py:**
+- `from app.graph.registry import get_generation_graph`
+- `from app.graph.state import GenerationState`
+- `from app.graph.runtime import GraphRuntimeConfig`
+- `uuid` for generating request_id
+- Removed: asyncio, all agent imports, ReviewPanelResult, CV, HallucinationReport
+
+**Logging preserved:**
+- Standard mode: "Pipeline: invoking LangGraph with thread_id={request_id} (standard mode)"
+- Review mode: "Pipeline: invoking LangGraph with thread_id={request_id} (review mode, hallucination_check={flag})"
+
+**Runtime verification:**
+✓ Imports work: `poetry run python -c "from app.agents.pipeline import generate_cv_standard, generate_cv_with_review"`
+✓ LSP: Import resolution error is LSP configuration (not runtime) — imports work at runtime
+✓ API contract: return dict structure byte-for-byte identical to original
+
+**Key insights from refactoring:**
+1. The LangGraph pattern cleanly separates concerns: state building, runtime config, graph invocation, response extraction
+2. ReviewPanelResult construction must happen in review_join (fan-in node) BEFORE routing to synthesis
+3. final_response population belongs in validate_node (the final stage) to ensure all data is available
+4. The graph.ainvoke pattern with configurable thread_id enables proper checkpointing for future persistence
+
+**Gotchas encountered:**
+- LSP reports missing import for app.graph.registry but Python import works fine (LSP path issue, not code issue)
+- review_panel must be serialized with .model_dump(mode="json") to match API response contract
+- review_join node must return the review_panel in state for validate_node to access it
+
+**Edge cases handled:**
+- Standard mode: review_panel is None (never populated by graph)
+- Review mode all succeed: review_panel has 3 reviews + consensus_score
+- Review mode partial failure: review_panel has only successful reviews + consensus calculated from them
+- Review mode all fail: review_panel has empty reviews list, consensus_score=0.0
+- Hallucination check failure: non-blocking, review_panel.hallucination_report=None

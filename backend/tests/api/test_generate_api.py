@@ -198,8 +198,8 @@ async def test_standard_mode_success(
     - ats_issues and hallucination_warnings are lists
     - Response matches GenerateResponse schema
     """
-    with patch("app.agents.pipeline.tailor_cv") as mock_tailor, \
-         patch("app.agents.pipeline.validate_cv") as mock_validate:
+    with patch("app.graph.nodes_generation.tailor_cv") as mock_tailor, \
+         patch("app.graph.nodes_generation.validate_cv") as mock_validate:
 
         # Setup mocks
         mock_tailor.return_value = mock_cv
@@ -264,13 +264,13 @@ async def test_review_mode_all_reviewers_succeed(
     - synthesis agent is called to refine CV
     - Final CV is validated
     """
-    with patch("app.agents.pipeline.tailor_cv") as mock_tailor, \
-         patch("app.agents.pipeline.review_as_hr") as mock_review_hr, \
-         patch("app.agents.pipeline.review_as_technical") as mock_review_tech, \
-         patch("app.agents.pipeline.review_as_ats") as mock_review_ats, \
-         patch("app.agents.pipeline.check_hallucinations_ai") as mock_halluc, \
-         patch("app.agents.pipeline.synthesize_cv") as mock_synthesize, \
-         patch("app.agents.pipeline.validate_cv") as mock_validate:
+    with patch("app.graph.nodes_generation.tailor_cv") as mock_tailor, \
+         patch("app.graph.nodes_generation.review_as_hr") as mock_review_hr, \
+         patch("app.graph.nodes_generation.review_as_technical") as mock_review_tech, \
+         patch("app.graph.nodes_generation.review_as_ats") as mock_review_ats, \
+         patch("app.graph.nodes_generation.check_hallucinations_ai") as mock_halluc, \
+         patch("app.graph.nodes_generation.synthesize_cv") as mock_synthesize, \
+         patch("app.graph.nodes_generation.validate_cv") as mock_validate:
 
         # Setup mocks
         mock_tailor.return_value = mock_cv
@@ -347,13 +347,13 @@ async def test_review_mode_partial_reviewer_failure(
     - Final response includes only successful reviews
     - Consensus score uses only successful reviews: (8 + 9) / 2 = 8.5
     """
-    with patch("app.agents.pipeline.tailor_cv") as mock_tailor, \
-         patch("app.agents.pipeline.review_as_hr") as mock_review_hr, \
-         patch("app.agents.pipeline.review_as_technical") as mock_review_tech, \
-         patch("app.agents.pipeline.review_as_ats") as mock_review_ats, \
-         patch("app.agents.pipeline.check_hallucinations_ai") as mock_halluc, \
-         patch("app.agents.pipeline.synthesize_cv") as mock_synthesize, \
-         patch("app.agents.pipeline.validate_cv") as mock_validate:
+    with patch("app.graph.nodes_generation.tailor_cv") as mock_tailor, \
+         patch("app.graph.nodes_generation.review_as_hr") as mock_review_hr, \
+         patch("app.graph.nodes_generation.review_as_technical") as mock_review_tech, \
+         patch("app.graph.nodes_generation.review_as_ats") as mock_review_ats, \
+         patch("app.graph.nodes_generation.check_hallucinations_ai") as mock_halluc, \
+         patch("app.graph.nodes_generation.synthesize_cv") as mock_synthesize, \
+         patch("app.graph.nodes_generation.validate_cv") as mock_validate:
 
         # Setup mocks
         mock_tailor.return_value = mock_cv
@@ -421,13 +421,13 @@ async def test_review_mode_all_reviewers_fail(
     - consensus_score is 0.0
     - Pipeline logs warning but completes
     """
-    with patch("app.agents.pipeline.tailor_cv") as mock_tailor, \
-         patch("app.agents.pipeline.review_as_hr") as mock_review_hr, \
-         patch("app.agents.pipeline.review_as_technical") as mock_review_tech, \
-         patch("app.agents.pipeline.review_as_ats") as mock_review_ats, \
-         patch("app.agents.pipeline.check_hallucinations_ai") as mock_halluc, \
-         patch("app.agents.pipeline.synthesize_cv") as mock_synthesize, \
-         patch("app.agents.pipeline.validate_cv") as mock_validate:
+    with patch("app.graph.nodes_generation.tailor_cv") as mock_tailor, \
+         patch("app.graph.nodes_generation.review_as_hr") as mock_review_hr, \
+         patch("app.graph.nodes_generation.review_as_technical") as mock_review_tech, \
+         patch("app.graph.nodes_generation.review_as_ats") as mock_review_ats, \
+         patch("app.graph.nodes_generation.check_hallucinations_ai") as mock_halluc, \
+         patch("app.graph.nodes_generation.synthesize_cv") as mock_synthesize, \
+         patch("app.graph.nodes_generation.validate_cv") as mock_validate:
 
         # Setup mocks
         mock_tailor.return_value = mock_cv
@@ -490,8 +490,8 @@ async def test_generate_response_schema_validation(
     - review_panel is None or dict with reviews, hallucination_report, consensus_score
     - Response can be deserialized to GenerateResponse Pydantic model
     """
-    with patch("app.agents.pipeline.tailor_cv") as mock_tailor, \
-         patch("app.agents.pipeline.validate_cv") as mock_validate:
+    with patch("app.graph.nodes_generation.tailor_cv") as mock_tailor, \
+         patch("app.graph.nodes_generation.validate_cv") as mock_validate:
 
         # Setup mocks
         mock_tailor.return_value = mock_cv

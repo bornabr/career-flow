@@ -162,14 +162,27 @@ async def validate_node(state: GenerationState, config: RunnableConfig) -> dict[
     """Deterministic post-generation validation node.
     
     Wraps validate_cv (no LLM calls) to perform ATS cleaning, fuzzy hallucination
-    detection, and empty section removal. No runtime config needed for this
-    deterministic validator.
+    detection, and empty section removal. Populates final_response for API return.
     """
     result = validate_cv(
         cv_data=state["current_cv_dict"],
         original_resume=state["resume_text"],
     )
     
+    # Build final_response dict matching the API contract
+    # In standard mode: review_panel is None
+    # In review mode: review_panel is ReviewPanelResult (populated by review_join node)
+    review_panel = state.get("review_panel")
+    
+    final_response = {
+        "cv_data": result["cv_data"],
+        "ats_issues": result["ats_issues"],
+        "hallucination_warnings": result["hallucination_warnings"],
+        "review_panel": review_panel.model_dump(mode="json") if review_panel else None,
+    }
+    
     return {
         "validation_result": result,
+        "final_response": final_response,
     }
+
