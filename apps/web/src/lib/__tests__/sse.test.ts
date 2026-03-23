@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { parseSSE, SSEEvent, EventHandlers } from "../sse";
+import { parseSSE, EventHandlers } from "../sse";
 
 describe("parseSSE", () => {
   describe("single event parsing", () => {

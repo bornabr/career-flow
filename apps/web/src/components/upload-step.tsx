@@ -5,7 +5,7 @@ import { Eye, EyeOff, FileUp, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { parseDocuments, generateCV, getModels, streamGenerateCV } from "@/lib/api";
-import type { CV } from "@/lib/types";
+import type { CV, ReviewMemo } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { GenerationProgress } from "@/components/generation-progress";
 import { Button } from "@/components/ui/button";
@@ -223,35 +223,36 @@ export function UploadStep() {
           review_model: reviewModel || null,
         },
         {
-          onRunStarted: (data: any) => {
-            setActiveThreadId(data.thread_id);
+          onRunStarted: (data: unknown) => {
+            setActiveThreadId((data as { thread_id: string }).thread_id);
           },
-          onStepStarted: (data: any) => {
-            setActiveStep(data.step);
+          onStepStarted: (data: unknown) => {
+            setActiveStep((data as { step: string }).step);
           },
-          onStepCompleted: (data: any) => {
-            addCompletedStep(data.step);
+          onStepCompleted: (data: unknown) => {
+            addCompletedStep((data as { step: string }).step);
             setActiveStep(null);
           },
-          onReviewMemo: (data: any) => {
-            addLiveReviewMemo(data);
+          onReviewMemo: (data: unknown) => {
+            addLiveReviewMemo(data as ReviewMemo);
           },
-          onValidationCompleted: (data: any) => {
-            setAtsIssues(data.ats_issues);
-            setHallucinationWarnings(data.hallucination_warnings);
+          onValidationCompleted: (data: unknown) => {
+            const payload = data as { ats_issues: string[]; hallucination_warnings: string[] };
+            setAtsIssues(payload.ats_issues);
+            setHallucinationWarnings(payload.hallucination_warnings);
           },
-          onResult: (data: any) => {
-            setCvData(data.cv_data as unknown as CV);
+          onResult: (data: unknown) => {
+            setCvData((data as { cv_data: unknown }).cv_data as CV);
             setRunStatus("completed");
             setStep("edit");
             toast.success("CV generated. You can now refine every section.");
           },
-          onError: (data: any) => {
-            setGenerationError(data.error);
+          onError: (data: unknown) => {
+            setGenerationError((data as { error: string }).error);
             setRunStatus("failed");
           },
-          onRunCompleted: (data: any) => {
-            if (data.success) {
+          onRunCompleted: (data: unknown) => {
+            if ((data as { success: boolean }).success) {
               setRunStatus("completed");
             }
           },
