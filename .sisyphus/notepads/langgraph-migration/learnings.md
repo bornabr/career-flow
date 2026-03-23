@@ -2425,3 +2425,72 @@ P4.6 (backend tests) was skipped due to Python 3.13 dylib environment issue. Man
 ### Verification
 ✓ `pnpm type-check` passed (web app TypeScript clean)
 ✓ All new types match backend ReviewApprovalPayload schema
+
+
+## P4.9-P4.10: HITL Review UI Components (2026-03-23)
+
+### Completed
+✓ Created ReviewerMemoCard component (102 lines)
+✓ Created ReviewCommitteePanel component (71 lines)
+✓ TypeScript compilation clean (pnpm build passed)
+
+### Key Design Decisions
+
+**ReviewerMemoCard**:
+- Displays single reviewer's memo (HR, Technical, or ATS)
+- Shows overall score and rationale in CardHeader
+- Lists all recommendations with individual Switch toggles
+- Severity badges: critical=red-500, warning=yellow-500, suggestion=blue-500
+- Default state: ALL items accepted (checked=true), user rejects to remove
+- Updates store.reviewDecisions on toggle via setReviewDecision(item_key, accepted)
+
+**ReviewCommitteePanel**:
+- Orchestrates display of all reviewer memos
+- Shows consensus score in header
+- Maps over interactive_reviews, renders ReviewerMemoCard for each
+- Submit button disabled when: isAwaitingReviewApproval || no decisions made
+- Placeholder handleSubmit (TODO for P4.12 streamReviewResume integration)
+- Graceful fallback: "No Review Pending" card when pendingReviewApproval is null
+
+### Component API
+
+**ReviewerMemoCard**:
+- Props: `{ memo: InteractiveReviewMemo }`
+- Reads from store: reviewDecisions, setReviewDecision
+- No internal state, purely controlled by Zustand
+
+**ReviewCommitteePanel**:
+- Props: None (reads all state from store)
+- Reads from store: pendingReviewApproval, reviewDecisions, isAwaitingReviewApproval
+- Calls: setIsAwaitingReviewApproval
+- Returns Card with "No Review Pending" if no payload
+
+### Files Created
+- `apps/web/src/components/reviewer-memo-card.tsx` — 102 lines
+- `apps/web/src/components/review-committee-panel.tsx` — 71 lines
+
+### Styling Patterns Observed
+- Used shadcn Card components (Card, CardHeader, CardTitle, CardDescription, CardContent)
+- Switch component from @base-ui/react via shadcn
+- Badge with custom className for severity colors (variant="outline" + bg-{color}-500)
+- Tailwind utility classes: flex, space-y-4, gap-3, rounded-lg, border, p-3
+- Responsive layout: flex-1 with overflow-y-auto for scrollable memo list
+
+### Integration Points (P4.11-P4.12)
+- P4.11: artifact-panel.tsx will import and render ReviewCommitteePanel in Reviews tab
+- P4.12: chat-workspace.tsx will populate pendingReviewApproval on interrupt.pending event
+- P4.12: streamReviewResume() function will be added to api.ts, replacing TODO placeholder
+
+### Default Acceptance Behavior
+IMPORTANT: Default state is ACCEPT ALL recommendations.
+- Switch checked state: `reviewDecisions[item_key] ?? true`
+- Rationale: Users actively reject items they disagree with, not opt-in
+- Backend expectation: Missing keys in reviewDecisions = accepted (not rejected)
+- This matches user mental model: "review and remove unwanted items"
+
+### Verification
+✓ pnpm build passed (TypeScript clean, no errors)
+✓ Components follow shadcn/ui patterns
+✓ Store integration matches P4.8 schema
+✓ Severity badge colors match specification
+✓ Default acceptance logic implemented correctly

@@ -552,7 +552,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - `emit_review_memo()` now includes normalized `item_key` values
   - **Verification:** `lsp_diagnostics` clean
 
-- [ ] **P4.8: Extend Zustand store for review approval state**
+- [x] **P4.8: Extend Zustand store for review approval state**
   - Update `apps/web/src/lib/store.ts`
   - Add fields:
     - `pendingReviewApproval: ReviewApprovalPayload | null`
@@ -561,7 +561,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Add setters
   - **Verification:** Type-check passes
 
-- [ ] **P4.9: Create review committee panel component**
+- [x] **P4.9: Create review committee panel component**
   - Create `apps/web/src/components/review-committee-panel.tsx`
   - Displays all interactive review memos
   - For each reviewer (HR, Technical, ATS):
@@ -570,7 +570,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Submit button calls resume endpoint
   - **Verification:** Unit test in `apps/web/src/components/__tests__/review-committee-panel.test.tsx`
 
-- [ ] **P4.10: Create reviewer memo card component**
+- [x] **P4.10: Create reviewer memo card component**
   - Create `apps/web/src/components/reviewer-memo-card.tsx`
   - Shows single reviewer's findings
   - Individual item toggles for accept/reject
