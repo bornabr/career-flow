@@ -2181,3 +2181,139 @@ So routing alone (`any accepted -> synthesis`) is not sufficient for item-level 
 - Missing/None `review_decisions`: all review memos pass through.
 - Missing item keys in decisions map: default reject (`False`).
 - Reviewer with zero accepted changes: excluded from `filtered_reviews`.
+
+## [2026-03-23] Task: P4.5 - Review Resume Stream Endpoint
+
+### What Was Created
+
+**File: `backend/app/api/chat.py`** (modified)
+
+#### Imports Added
+```python
+from langgraph.types import Command
+```
+
+#### Request Model Added
+```python
+class ReviewResumeRequest(BaseModel):
+    thread_id: str = Field(..., description="Thread ID from original generation request")
+    decisions: list[dict[str, bool]] = Field(..., description="List of {item_key: str, accepted: bool}")
+    api_key: str | None = None
+    model_name: str | None = None
+```
+
+#### Endpoint Implementation
+```python
+@router.post("/review/resume/stream")
+async def stream_review_resume(request: ReviewResumeRequest):
+    settings = get_settings()
+    
+    model_name = request.model_name or settings.model_name
+    provider = model_name.split(":")[0] if ":" in model_name else "openai"
+    api_key = _resolve_api_key(settings, provider, request.api_key)
+    
+    runtime = GraphRuntimeConfig(
+        model_name=model_name,
+        api_key=api_key,
+    )
+    
+    # Convert list of dicts to {item_key: accepted} dict
+    decisions_dict = {d["item_key"]: d["accepted"] for d in request.decisions}
+    
+    graph = get_generation_graph()
+    config = {
+        "configurable": {
+            "thread_id": request.thread_id,
+            "runtime": runtime,
+        }
+    }
+    
+    # Use Command to resume from interrupt
+    resume_command = Command(resume={"review_decisions": decisions_dict})
+    
+    return StreamingResponse(
+        stream_generation(resume_command, config, graph),
+        media_type="text/event-stream",
+    )
+```
+
+### Pattern Analysis
+
+#### ReviewResumeRequest Structure
+- **thread_id**: Session identifier from original generation (same thread as paused graph)
+- **decisions**: List of {item_key, accepted} dicts representing user's accept/reject on review recommendations
+- **api_key, model_name**: Optional overrides for resumption (use same model as original)
+
+#### LangGraph Command API Pattern
+```python
+# This is how LangGraph resumes from interrupt:
+resume_command = Command(resume={"review_decisions": decisions_dict})
+
+# Graph's review_gate node had:
+interrupt(value=payload)
+
+# When resuming, the graph receives the Command's resume dict
+# and continues from the interrupt point
+```
+
+#### Config Structure
+- Uses existing **thread_id** (not new uuid) to retrieve checkpoint state
+- Uses same **runtime** (model_name, api_key) for consistency
+- Passes config to graph.astream() which restores state from checkpointer
+
+#### Streaming Response Pattern
+- Uses existing `stream_generation()` helper (same as /generate/stream)
+- Helper handles Command vs State (both work with astream)
+- Returns SSE StreamingResponse with proper content-type headers
+- Events flow: Custom events from graph → SSE-formatted → HTTP response
+
+### Key Insights from P4.3-P4.5
+
+1. **Review_gate Pause Point**: Graph pauses with `interrupt(value=payload)` before validation
+2. **Decisions Format**: `{item_key: bool}` where item_key is `"{reviewer_role}:{index}"` (e.g., "hr:0")
+3. **Command API**: `Command(resume=data)` tells LangGraph to continue from interrupt with provided data
+4. **Thread ID Continuity**: Same thread_id ensures checkpoint manager returns correct state snapshot
+5. **No State Building**: Unlike /generate/stream (which builds initial state), resume uses Command only
+6. **SSE Events**: Graph continues emitting events from review_apply onwards (synthesis, validation, etc.)
+
+### Dependency Chain
+- P4.1 (schemas) ✅ Defines ReviewResumeRequest, review_decisions field
+- P4.2 (normalization) ✅ Normalizes decisions before review_apply
+- P4.3 (review_gate) ✅ Creates interrupt with pending value
+- P4.4 (review_apply) ✅ Consumes review_decisions from graph state
+- P4.5 (this task) ✅ Endpoint to accept user decisions and resume graph
+
+### Verification
+
+✅ **Code added:**
+- ReviewResumeRequest model with proper Field descriptors
+- POST /review/resume/stream endpoint following chat.py patterns
+- Command import from langgraph.types
+
+✅ **LSP diagnostics:**
+- Type-unknown warnings only (expected for LangGraph/FastAPI without deps)
+- No syntax errors
+- No missing imports
+
+✅ **Pattern consistency:**
+- Follows existing _resolve_api_key() pattern
+- Uses GraphRuntimeConfig same as other endpoints
+- Uses stream_generation() helper (reused)
+- Returns StreamingResponse with text/event-stream (standard)
+
+### Design Decisions
+
+1. **Decisions as list[dict]**: API accepts list structure, converts to dict internally for cleaner graph data
+2. **No new SSE events**: Uses existing stream_generation() which already handles graph events
+3. **Reuses runtime config**: No need for review_model here—only main model is used for synthesis
+4. **No state initialization**: Command pattern is fundamentally different from State pattern (resume vs fresh)
+5. **Same thread_id**: Critical for checkpoint retrieval—different thread would fail to find paused execution
+
+### Next Phase
+
+P4.6: Write integration tests for resume endpoint
+- Mock thread_id retrieval from checkpointer
+- Verify Command(resume=...) format passed to graph
+- Test SSE event emission after resumption
+- Test decision application through review_apply node
+

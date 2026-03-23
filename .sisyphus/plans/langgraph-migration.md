@@ -525,7 +525,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Wire into graph after `review_gate`
   - **Verification:** Unit test with various decision combinations
 
-- [ ] **P4.5: Create review resume endpoint**
+- [x] **P4.5: Create review resume endpoint**
   - Update `backend/app/api/chat.py`
   - Add `POST /api/chat/review/resume/stream`:
     - Request: `{thread_id, decisions: [{item_key, accepted}], api_key, model_name}`

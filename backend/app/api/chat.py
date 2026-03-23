@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from app.api.sse import format_sse, stream_generation
@@ -46,6 +47,13 @@ class RefineStreamRequest(BaseModel):
     resume_text: str
     job_description: str
     latest_user_message: str
+    api_key: str | None = None
+    model_name: str | None = None
+
+
+class ReviewResumeRequest(BaseModel):
+    thread_id: str = Field(..., description="Thread ID from original generation request")
+    decisions: list[dict[str, bool]] = Field(..., description="List of {item_key: str, accepted: bool}")
     api_key: str | None = None
     model_name: str | None = None
 
@@ -258,3 +266,36 @@ async def stream_refine(request: RefineStreamRequest):
             yield format_sse({"type": "error", "data": {"message": str(exc)}})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/review/resume/stream")
+async def stream_review_resume(request: ReviewResumeRequest):
+    settings = get_settings()
+
+    model_name = request.model_name or settings.model_name
+    provider = model_name.split(":")[0] if ":" in model_name else "openai"
+    api_key = _resolve_api_key(settings, provider, request.api_key)
+
+    runtime = GraphRuntimeConfig(
+        model_name=model_name,
+        api_key=api_key,
+    )
+
+    # Convert list of dicts to {item_key: accepted} dict
+    decisions_dict = {d["item_key"]: d["accepted"] for d in request.decisions}
+
+    graph = get_generation_graph()
+    config = {
+        "configurable": {
+            "thread_id": request.thread_id,
+            "runtime": runtime,
+        }
+    }
+
+    # Use Command to resume from interrupt
+    resume_command = Command(resume={"review_decisions": decisions_dict})
+
+    return StreamingResponse(
+        stream_generation(resume_command, config, graph),
+        media_type="text/event-stream",
+    )
