@@ -416,7 +416,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Create `apps/web/src/components/artifact-panel.tsx` (tabs: CV editor, preview, reviews)
   - **Verification:** Individual unit tests for each
 
-- [ ] **P3.13: Refactor page.tsx for two-pane layout**
+- [x] **P3.13: Refactor page.tsx for two-pane layout**
   - Update `apps/web/src/app/page.tsx`
   - Replace step-based rendering with mode toggle
   - Layout:
