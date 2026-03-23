@@ -2029,3 +2029,8 @@ graph LR
 - Extracted chat message rendering into a separate component.
 - Used `useRef` and `scrollIntoView` for auto-scrolling to the bottom of the message list.
 - Mocked `scrollIntoView` in tests since jsdom doesn't implement it.
+
+### P3.15: Update global styles for chat layout
+- **Tailwind 4 CSS Variables**: Tailwind 4 exposes CSS variables directly (e.g., `var(--border)`, `var(--background)`). When using `oklch` colors defined in `:root`, use `var(--color-name)` or `var(--name)` directly instead of wrapping them in `hsl()`.
+- **Responsive Layouts with `overflow-hidden`**: When a parent container (like `main`) has `overflow-hidden`, child flex containers must explicitly handle their own scrolling (e.g., `overflow-y: auto`) and have a defined height (like `height: 100%` or `min-height`) to prevent content from being cut off, especially when stacking elements on mobile.
+- **Sticky Elements in Flex Containers**: To make an element sticky at the bottom of a scrollable flex container, ensure the container has `overflow-y: auto` and the sticky element has `position: sticky; bottom: 0; z-index: 10;`.
