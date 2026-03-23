@@ -16,11 +16,11 @@ describe("ArtifactPanel", () => {
     expect(screen.getByRole("tab", { name: /reviews/i })).toBeInTheDocument();
   });
 
-  it("shows CV placeholder by default", () => {
+  it("renders CVEditor component in cv tab by default", () => {
     useAppStore.setState({ artifactTab: "cv" });
     render(<ArtifactPanel />);
     
-    expect(screen.getByText("CV editor will go here")).toBeInTheDocument();
+    expect(screen.getByText("No CV data yet")).toBeInTheDocument();
   });
 
   it("changes tab when clicked and updates store", () => {
@@ -30,6 +30,6 @@ describe("ArtifactPanel", () => {
     fireEvent.click(previewTab);
     
     expect(useAppStore.getState().artifactTab).toBe("preview");
-    expect(screen.getByText("CV preview will go here")).toBeInTheDocument();
+    expect(previewTab).toHaveAttribute("aria-selected", "true");
   });
 });
