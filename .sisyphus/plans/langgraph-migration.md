@@ -394,7 +394,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Add setters and array manipulation helpers
   - **Verification:** Type-check passes
 
-- [ ] **P3.10: Extend API client for chat endpoints**
+- [x] **P3.10: Extend API client for chat endpoints**
   - Update `apps/web/src/lib/api.ts`
   - Add:
     - `streamIntakeChat(messages, handlers)`
@@ -402,7 +402,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - `streamRefinementChat(threadId, messages, cvData, handlers)`
   - **Verification:** Type-check passes
 
-- [ ] **P3.11: Create chat workspace component**
+- [x] **P3.11: Create chat workspace component**
   - Create `apps/web/src/components/chat-workspace.tsx`
   - Implements Assistant mode orchestration:
     - Phase: intake → generation → refinement

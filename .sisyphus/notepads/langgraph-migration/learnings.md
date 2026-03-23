@@ -1995,3 +1995,32 @@ graph LR
 - No changes to existing functions
 - Error messages follow existing pattern (specific endpoint description)
 
+## [2026-03-22 22:30] Task: P3.11 - Chat Workspace Orchestration
+
+**What was created:**
+- `apps/web/src/components/chat-workspace.tsx`
+- `apps/web/src/components/__tests__/chat-workspace.test.tsx`
+
+**Implementation patterns that worked:**
+- Single orchestrator component with phase-driven branching (`intake` / `generation` / `refinement`) keeps flow explicit and easy to test.
+- Local `createTextMessage()` helper keeps ChatMessage shape consistent across all turns and reduces duplicated object construction.
+- `useEffect` gate on `intakeReady && chatPhase === "intake"` reliably triggers one-way transition into generation.
+- Casting handler objects to `Parameters<typeof stream...>[index]` avoids changing API/store contracts while still wiring phase-specific SSE callbacks (`onMessage`, `onArtifactUpdate`, `onIntakeReady`, `onComplete`, `onError`).
+
+**Behavior contracts implemented:**
+- Intake send → `streamIntakeChat`
+- `intakeReady=true` → auto `streamAssistantGenerate` + phase set to `generation`
+- Generation complete → phase set to `refinement` + assistant ready message appended
+- Refinement send → `streamRefinementChat`
+- Input disabled during generation or non-idle assistant status
+
+**Testing learnings (Vitest + Zustand):**
+- Mocking API module at file scope (`vi.mock("@/lib/api")`) works cleanly for per-phase assertions.
+- Zustand state transitions triggered outside user events should be wrapped in `act()` to avoid React warnings.
+- Phase assertions are most stable when checking store state (`useAppStore.getState()`) plus one user-visible UI assertion.
+
+**Verification results:**
+- `pnpm vitest run src/components/__tests__/chat-workspace.test.tsx` → 6/6 passing
+- `pnpm type-check` (repo root turbo check) → passing
+- `pnpm --filter @career-flow/web exec tsc --noEmit` → passing
+- Note: `lsp_diagnostics` unavailable in this environment because `typescript-language-server` is not installed.
