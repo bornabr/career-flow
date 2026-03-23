@@ -2024,3 +2024,8 @@ graph LR
 - `pnpm type-check` (repo root turbo check) → passing
 - `pnpm --filter @career-flow/web exec tsc --noEmit` → passing
 - Note: `lsp_diagnostics` unavailable in this environment because `typescript-language-server` is not installed.
+
+## ChatMessageList Component
+- Extracted chat message rendering into a separate component.
+- Used `useRef` and `scrollIntoView` for auto-scrolling to the bottom of the message list.
+- Mocked `scrollIntoView` in tests since jsdom doesn't implement it.
