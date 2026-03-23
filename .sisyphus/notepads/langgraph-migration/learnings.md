@@ -2391,3 +2391,37 @@ P4.6 (backend tests) was skipped due to Python 3.13 dylib environment issue. Man
 - No breaking changes
 - Backward compatible
 
+
+## P4.8: Zustand Store Review Approval Flow (2026-03-23)
+
+### Completed
+✓ Added 3 new state fields to AppState interface:
+  - `pendingReviewApproval: ReviewApprovalPayload | null` (interrupt payload from backend)
+  - `reviewDecisions: Record<string, boolean>` (item_key → accepted mapping)
+  - `isAwaitingReviewApproval: boolean` (UI flag for showing review panel)
+
+✓ Added 4 setter functions following flat store pattern:
+  - `setPendingReviewApproval(payload)` — accepts null to clear
+  - `setReviewDecision(itemKey, accepted)` — mutates reviewDecisions via spread
+  - `clearReviewDecisions()` — resets to empty object
+  - `setIsAwaitingReviewApproval(awaiting)` — boolean flag
+
+✓ Added ReviewApprovalPayload types to types.ts:
+  - `ReviewApprovalPayload` (matches backend schema)
+  - `InteractiveReviewMemo` (reviewer + items + score)
+  - `InteractiveReviewItem` (item_key, recommendation, rationale, severity)
+
+### Key Patterns Observed
+- Zustand flat store: single store object, no slices
+- State mutations: use spread operator for Record updates
+- Initial state: all new fields added to initialState object
+- Type imports: added to store.ts imports from types.ts
+- Reset function: auto-includes new fields via initialState
+
+### Files Modified
+- `apps/web/src/lib/types.ts` — added 3 interface types
+- `apps/web/src/lib/store.ts` — added fields, functions, initial values
+
+### Verification
+✓ `pnpm type-check` passed (web app TypeScript clean)
+✓ All new types match backend ReviewApprovalPayload schema

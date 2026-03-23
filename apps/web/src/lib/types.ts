@@ -82,6 +82,26 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface InteractiveReviewItem {
+  item_key: string;
+  recommendation: string;
+  rationale: string;
+  severity: "critical" | "warning" | "suggestion";
+}
+
+export interface InteractiveReviewMemo {
+  reviewer_role: "hr" | "technical" | "ats";
+  items: InteractiveReviewItem[];
+  overall_score: number;
+  overall_rationale: string;
+}
+
+export interface ReviewApprovalPayload {
+  interactive_reviews: InteractiveReviewMemo[];
+  hallucination_report: Record<string, unknown> | null;
+  consensus_score: number;
+}
+
 // ─── Helpers ─────────────────────────────────────
 
 export function createEmptyCV(): CV {

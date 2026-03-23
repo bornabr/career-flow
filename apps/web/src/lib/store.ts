@@ -7,6 +7,7 @@ import type {
   PersonalProjectEntry,
   ReviewMemo,
   ChatMessage,
+  ReviewApprovalPayload,
 } from "@/lib/types";
 
 // Re-export types from shared definitions for convenience
@@ -130,6 +131,17 @@ interface AppState {
   intakeReady: boolean;
   setIntakeReady: (ready: boolean) => void;
 
+  // ─── Review approval flow ───────────────────────
+  pendingReviewApproval: ReviewApprovalPayload | null;
+  setPendingReviewApproval: (payload: ReviewApprovalPayload | null) => void;
+
+  reviewDecisions: Record<string, boolean>;
+  setReviewDecision: (itemKey: string, accepted: boolean) => void;
+  clearReviewDecisions: () => void;
+
+  isAwaitingReviewApproval: boolean;
+  setIsAwaitingReviewApproval: (awaiting: boolean) => void;
+
   // ─── Reset ──────────────────────────────────────
   reset: () => void;
 }
@@ -167,6 +179,9 @@ const initialState = {
   artifactTab: "cv" as const,
   assistantStatus: "idle" as const,
   intakeReady: false,
+  pendingReviewApproval: null as ReviewApprovalPayload | null,
+  reviewDecisions: {} as Record<string, boolean>,
+  isAwaitingReviewApproval: false,
 };
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -241,6 +256,16 @@ export const useAppStore = create<AppState>()((set) => ({
   setArtifactTab: (artifactTab) => set({ artifactTab }),
   setAssistantStatus: (assistantStatus) => set({ assistantStatus }),
   setIntakeReady: (intakeReady) => set({ intakeReady }),
+
+  setPendingReviewApproval: (pendingReviewApproval) =>
+    set({ pendingReviewApproval }),
+  setReviewDecision: (itemKey, accepted) =>
+    set((state) => ({
+      reviewDecisions: { ...state.reviewDecisions, [itemKey]: accepted },
+    })),
+  clearReviewDecisions: () => set({ reviewDecisions: {} }),
+  setIsAwaitingReviewApproval: (isAwaitingReviewApproval) =>
+    set({ isAwaitingReviewApproval }),
 
   reset: () => set(initialState),
 }));
