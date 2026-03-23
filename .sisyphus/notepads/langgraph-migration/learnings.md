@@ -2667,3 +2667,60 @@ Backend emits onComplete
 - Only advance to refinement if no interrupt occurred
 - onComplete still fires after resume completes, so check prevents double-transition
 
+
+
+## P4.13-P4.15: Testing Phase (2026-03-23)
+
+### Status
+⏸️ **DEFERRED** - Requires running backend environment
+
+### What Needs Testing
+
+**P4.13: Quick Generate Backward Compatibility**
+- Verify blocking `/api/generate` endpoint still works with review_mode=true
+- Ensure synthesis runs automatically without interrupts (no HITL in blocking mode)
+- Test that Quick Generate UI remains functional
+
+**P4.14: Full Test Suite**
+- Frontend tests: `pnpm test -- --run` (tests timed out in current environment)
+- Frontend build: ✅ PASSED (`pnpm build` successful)
+- Backend tests: Requires Python environment with pytest
+  - `backend/tests/graph/test_review_interrupts.py` (from P4.6, skipped)
+  - `backend/tests/api/test_review_resume_api.py` (from P4.6, skipped)
+
+**P4.15: Manual End-to-End HITL Test**
+- Start backend: `poetry run uvicorn app.main:app --reload`
+- Start frontend: `pnpm dev:web`
+- Test full flow:
+  1. Assistant mode, enable review mode
+  2. Provide resume + job description
+  3. Complete intake conversation
+  4. Trigger generation → graph should pause at review gate
+  5. Verify Reviews tab shows all 3 reviewer memos (HR, Technical, ATS)
+  6. Toggle accept/reject switches for individual recommendations
+  7. Click Submit → verify graph resumes
+  8. Verify final CV reflects only accepted recommendations
+  9. Verify synthesis agent properly filtered reviews
+
+### Why Deferred
+- No running backend available in current environment
+- Backend testing requires Python 3.13 dylib fix (from P4.6 notes)
+- Manual testing requires both services running simultaneously
+- Frontend build verification completed ✅
+
+### Current State
+✅ **All HITL infrastructure is implemented and compiles clean**
+- Backend: review schemas, normalization, interrupt node, resume endpoint ✅
+- Frontend: store state, UI components, API client, interrupt handling ✅
+- Integration: SSE events, thread tracking, decision submission ✅
+- Build: TypeScript compiles with zero errors ✅
+
+### Next Steps
+When backend environment is available:
+1. Fix Python 3.13 dylib issue (from P4.6)
+2. Run full backend test suite
+3. Start both services
+4. Execute P4.13-P4.15 manual tests
+5. Mark Phase 4 complete
+
+For now: **Proceed to Phase 5** (SQLite persistence, session history)

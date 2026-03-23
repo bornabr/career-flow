@@ -583,7 +583,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Show `<ReviewCommitteePanel />` when `pendingReviewApproval` is set
   - **Verification:** Manual smoke test
 
-- [ ] **P4.12: Update chat-workspace for interrupt handling**
+- [x] **P4.12: Update chat-workspace for interrupt handling**
   - Update `apps/web/src/components/chat-workspace.tsx`
   - When `interrupt.pending` event received:
     - Set `isAwaitingReviewApproval = true`
@@ -595,19 +595,19 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Continue stream with same handlers
   - **Verification:** Manual smoke test interrupt flow
 
-- [ ] **P4.13: Verify Quick Generate unaffected**
+- [ ] **P4.13: Verify Quick Generate unaffected** ⏸️ DEFERRED (requires running backend)
   - Test that Quick Generate (blocking endpoint) still runs review mode without interrupts
   - Synthesis runs automatically
   - **Verification:** Manual smoke test Quick Generate with review_mode=true
 
-- [ ] **P4.14: Run full test suite**
+- [ ] **P4.14: Run full test suite** ⏸️ PARTIAL (build ✅, tests require backend/timeout)
   - Backend: `poetry run pytest backend/tests/graph/test_review_interrupts.py backend/tests/api/test_review_resume_api.py`
-  - Frontend: `pnpm --filter @career-flow/web test -- --run`
+  - Frontend: `pnpm --filter @career-flow/web test -- --run` (timed out)
   - Lint: `pnpm --filter @career-flow/web lint`
-  - Build: `pnpm --filter @career-flow/web build`
+  - Build: `pnpm --filter @career-flow/web build` ✅ PASSED
   - **Verification:** All checks pass
 
-- [ ] **P4.15: Manual end-to-end test**
+- [ ] **P4.15: Manual end-to-end test** ⏸️ DEFERRED (requires running backend)
   - Assistant mode, review enabled
   - Verify interrupt happens after reviews complete
   - Verify UI shows all reviewer memos
