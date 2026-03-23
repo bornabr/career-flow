@@ -410,7 +410,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Calls appropriate streaming endpoint per phase
   - **Verification:** Unit test in `apps/web/src/components/__tests__/chat-workspace.test.tsx`
 
-- [ ] **P3.12: Create chat UI components**
+- [x] **P3.12: Create chat UI components**
   - Create `apps/web/src/components/chat-message-list.tsx` (renders message history)
   - Create `apps/web/src/components/chat-composer.tsx` (input + send button)
   - Create `apps/web/src/components/artifact-panel.tsx` (tabs: CV editor, preview, reviews)
