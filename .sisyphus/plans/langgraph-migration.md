@@ -299,7 +299,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - `ArtifactUpdate` (type, cv_data)
   - **Verification:** Import schemas, inspect types
 
-- [ ] **P3.2: Create intake agent**
+- [x] **P3.2: Create intake agent**
   - Create `backend/app/agents/chat_prompts.py` with system prompts for intake and refinement
   - Create `backend/app/agents/intake.py`
   - Implement `intake_agent` (pydantic-ai Agent):

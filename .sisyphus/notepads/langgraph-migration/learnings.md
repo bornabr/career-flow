@@ -1620,3 +1620,42 @@ P3.1 enables:
 - P3.3: Refinement agent that returns RefinementResult
 - P3.7: Chat API endpoints that consume/return these schemas
 - Frontend chat components that deserialize these types
+
+## [2026-03-22] Task: P3.2 - Create Intake Agent
+
+### What was created
+
+- `backend/app/agents/chat_prompts.py`
+  - Added `INTAKE_SYSTEM_PROMPT` with strict one-question-per-turn behavior and readiness gating.
+  - Added `REFINEMENT_SYSTEM_PROMPT` placeholder for upcoming P3.3 work.
+
+- `backend/app/agents/intake.py`
+  - Added module-level `intake_agent = Agent("test", output_type=IntakeTurnResult, system_prompt=INTAKE_SYSTEM_PROMPT)`.
+  - Added `build_intake_prompt(...)` to compose turn context from conversation history + resume + JD + user instructions.
+  - Added `run_intake_turn(...)` using runtime model injection via `create_model_from_string(...)` and `await intake_agent.run(prompt, model=model)`.
+
+- `backend/tests/agents/test_intake.py`
+  - Added async unit tests with mocked model creation + mocked `intake_agent.run` outputs.
+  - Verifies missing-info turn returns one-question response and unresolved fields.
+  - Verifies ready state returns `ready_to_generate=True` with extracted constraints and no follow-up question.
+
+### Patterns confirmed
+
+1. Agent construction pattern remains consistent with existing agents:
+   - placeholder model at module load (`"test"`)
+   - runtime model override in function call (`run(model=...)`)
+
+2. Intake prompt should reinforce behavior redundantly in both places:
+   - system prompt constant (global policy)
+   - per-turn prompt body (turn-specific constraints and context)
+
+3. Mocking pydantic-ai agent calls in tests works cleanly by returning:
+   - `SimpleNamespace(output=<Pydantic model>)`
+   - patched async call: `AsyncMock(return_value=...)`
+
+### Environment verification blocker
+
+- Local backend verification commands could not run in this environment:
+  - Poetry venv references missing Homebrew Python path (`python@3.13/3.13.3` dylib missing)
+  - System python lacks backend deps (`pytest`, `pydantic_ai`)
+- Result: runtime import/test execution blocked despite successful file creation and LSP shape checks.
