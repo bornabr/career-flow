@@ -2154,3 +2154,30 @@ graph LR
 **Verification run:**
 - `python3 -m py_compile backend/app/graph/state.py backend/app/graph/events.py backend/app/graph/build_generation_graph.py` ✅
 - `lsp_diagnostics(filePath="backend/app/graph", extension=".py")` executed (pre-existing baseline diagnostics still present in graph package)
+
+## [2026-03-23 10:05] Task: P4.4 - review_apply_node Item-Level Filtering
+
+**Status:** ✅ COMPLETED
+
+**Investigation outcome:** Filtering is required.
+
+Reasoning from `backend/app/agents/synthesis.py`:
+- Synthesis prompt explicitly includes each memo's `priority_changes` (`_format_review_memos`, "Priority changes" section).
+- Synthesis instructions tell model to incorporate reviewer recommendations.
+- If rejected items remain in `priority_changes`, synthesis still sees and can apply them.
+
+So routing alone (`any accepted -> synthesis`) is not sufficient for item-level approval.
+
+**Implementation applied:**
+- Added `review_apply_node(state)` in `backend/app/graph/nodes_generation.py`.
+- It filters each memo's `priority_changes` by accepted `item_key` format `{reviewer_role}:{index}`.
+- It creates filtered memo copies via `model_copy(...)` (no mutation of original `reviews`).
+- Empty filtered memos are dropped.
+- No decisions provided -> passthrough deep copies of all reviews.
+- Added `filtered_reviews: list[ReviewMemo]` to `GenerationState` in `backend/app/graph/state.py`.
+- Updated `synthesis_node` to call `review_apply_node` and pass `filtered_reviews` to `synthesize_cv`.
+
+**Edge-case behavior locked in:**
+- Missing/None `review_decisions`: all review memos pass through.
+- Missing item keys in decisions map: default reject (`False`).
+- Reviewer with zero accepted changes: excluded from `filtered_reviews`.

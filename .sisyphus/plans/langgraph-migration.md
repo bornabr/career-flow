@@ -516,7 +516,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     ```
   - **Verification:** `lsp_diagnostics` clean
 
-- [ ] **P4.4: Add review apply node**
+- [x] **P4.4: Add review apply node**
   - Create `review_apply_node` in `backend/app/graph/nodes_generation.py`:
     - Takes `review_decisions` from state
     - Filters ReviewMemo list based on accepted items

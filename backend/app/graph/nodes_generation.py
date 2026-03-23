@@ -22,6 +22,7 @@ from app.graph.events import (
 )
 from app.graph.runtime import GraphRuntimeConfig
 from app.graph.state import GenerationState
+from app.schemas.review import ReviewMemo
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,37 @@ async def hallucination_check_node(state: GenerationState, config: RunnableConfi
         return {}
 
 
+async def review_apply_node(state: GenerationState) -> dict[str, Any]:
+    reviews = state.get("reviews", [])
+    review_decisions = state.get("review_decisions")
+
+    if not reviews:
+        return {"filtered_reviews": []}
+
+    if not review_decisions:
+        return {"filtered_reviews": [memo.model_copy(deep=True) for memo in reviews]}
+
+    filtered_reviews: list[ReviewMemo] = []
+    for memo in reviews:
+        accepted_priority_changes = [
+            priority_change
+            for index, priority_change in enumerate(memo.priority_changes)
+            if review_decisions.get(f"{memo.reviewer_role}:{index}", False)
+        ]
+
+        if not accepted_priority_changes:
+            continue
+
+        filtered_reviews.append(
+            memo.model_copy(
+                update={"priority_changes": accepted_priority_changes},
+                deep=True,
+            )
+        )
+
+    return {"filtered_reviews": filtered_reviews}
+
+
 async def synthesis_node(state: GenerationState, config: RunnableConfig) -> dict[str, Any]:
     """Synthesis agent node for refining CV based on reviewer feedback.
     
@@ -182,10 +214,12 @@ async def synthesis_node(state: GenerationState, config: RunnableConfig) -> dict
     emit_step_started(writer, "synthesis")
     
     runtime: GraphRuntimeConfig = config["configurable"]["runtime"]
+    filtered_state = await review_apply_node(state)
+    filtered_reviews: list[ReviewMemo] = filtered_state["filtered_reviews"]
     
     refined_cv = await synthesize_cv(
         cv_data=state["current_cv_dict"],
-        reviews=state["reviews"],
+        reviews=filtered_reviews,
         resume_text=state["resume_text"],
         job_description=state["job_description"],
         model_name=runtime.model_name,
@@ -195,6 +229,7 @@ async def synthesis_node(state: GenerationState, config: RunnableConfig) -> dict
     emit_step_completed(writer, "synthesis")
     
     return {
+        "filtered_reviews": filtered_reviews,
         "current_cv_dict": refined_cv.model_dump(mode="json"),
     }
 
@@ -237,4 +272,3 @@ async def validate_node(state: GenerationState, config: RunnableConfig) -> dict[
         "validation_result": result,
         "final_response": final_response,
     }
-

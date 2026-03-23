@@ -23,6 +23,7 @@ class GenerationState(TypedDict, total=False):
         review_errors: List of error dicts when reviewers fail (reducer: append)
         hallucination_report: Optional hallucination analysis report
         review_panel: Aggregated review panel result
+        filtered_reviews: Review memos filtered by user item-level decisions
         validation_result: Output from validator (ats_issues, hallucination_warnings)
         final_response: Final API response dict
     """
@@ -41,5 +42,6 @@ class GenerationState(TypedDict, total=False):
     interactive_reviews: list[InteractiveReviewMemo]
     awaiting_review_approval: bool
     review_decisions: dict[str, bool] | None
+    filtered_reviews: list[ReviewMemo]
     validation_result: dict[str, Any] | None
     final_response: dict[str, Any] | None
