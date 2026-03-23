@@ -1867,3 +1867,41 @@ graph LR
     START --> refinement
     refinement --> END
 ```
+
+## [2026-03-22] Task: P3.7 - Chat API Endpoints with SSE
+
+### Endpoint design pattern applied
+
+- Created `backend/app/api/chat.py` with three JSON-body SSE endpoints:
+  - `POST /api/chat/intake/stream`
+  - `POST /api/chat/generate/stream`
+  - `POST /api/chat/refine/stream`
+- Registered router in `backend/app/main.py` with:
+  - `app.include_router(chat.router, prefix="/api/chat", tags=["chat"])`
+
+### Request model conventions
+
+- Added Pydantic request models with optional `api_key` + `model_name` on all routes to match `generate.py` override behavior.
+- Intake request includes `messages`, resume/job inputs, and optional `user_instructions`.
+- Generate request mirrors generation options (`review_mode`, optional `review_model`) and carries `extracted_constraints` for chat-context handoff.
+- Refine request includes conversation `messages`, `current_cv_dict`, `latest_user_message`, and source context (`resume_text`, `job_description`).
+
+### Streaming/event mapping pattern
+
+- Reused `format_sse()` from `app.api.sse` for consistent wire format.
+- Reused `stream_generation()` for `/api/chat/generate/stream` to keep generation streaming behavior aligned with `/api/generate/stream`.
+- For intake/refine, consumed `graph.astream(..., stream_mode=["custom", "updates"])` and translated node updates into chat-specific events:
+  - `intake.ready` from `ready_to_generate` + extracted constraints + missing fields
+  - `chat.message.completed` from `assistant_reply`
+  - `artifact.cv.updated` from `updated_cv_dict`
+- Passed through custom node events unchanged (e.g., `chat.intake.started`, `chat.refinement.completed`).
+
+### Runtime/config conventions
+
+- API key resolution follows existing provider parsing pattern (`provider:model`) with request override precedence.
+- Each request builds a fresh `GraphRuntimeConfig` and unique UUID thread ID inside `config["configurable"]`.
+- Review mode in chat generation resolves `review_model` + review provider key through the same server fallback path.
+
+### Implementation note
+
+- `chat.message.delta` is intentionally not emitted in this phase (no token-level LLM streaming yet); endpoint emits completion-level chat events only.

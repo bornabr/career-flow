@@ -357,7 +357,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Update `backend/app/graph/registry.py` to compile and cache them
   - **Verification:** Draw mermaid diagrams for both graphs
 
-- [ ] **P3.7: Create chat API endpoints**
+- [x] **P3.7: Create chat API endpoints**
   - Create `backend/app/api/chat.py`
   - Add routes:
     - `POST /api/chat/intake/stream` (SSE)

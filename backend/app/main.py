@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api import parse, generate, pdf, cover_letter
+from app.api import parse, generate, pdf, cover_letter, chat
 from app.services.pdf import shutdown_browser
 
 
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(generate.router, prefix="/api", tags=["generate"])
     app.include_router(pdf.router, prefix="/api", tags=["pdf"])
     app.include_router(cover_letter.router, prefix="/api", tags=["cover-letter"])
+    app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
     @app.get("/health")
     async def health_check():
