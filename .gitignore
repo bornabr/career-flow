@@ -36,3 +36,6 @@ rendercv_output/
 
 # Misc
 .cache/
+
+# Session persistence
+data/

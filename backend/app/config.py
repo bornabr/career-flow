@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     # File upload
     max_upload_size_mb: int = 10
 
+    # Session persistence
+    langgraph_sqlite_path: str = "data/langgraph.db"
+    session_page_size_default: int = 20
+
     model_config = {
         # Look for .env in backend/ first, then fall back to repo root
         "env_file": (
