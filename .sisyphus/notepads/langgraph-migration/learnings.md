@@ -2724,3 +2724,73 @@ When backend environment is available:
 5. Mark Phase 4 complete
 
 For now: **Proceed to Phase 5** (SQLite persistence, session history)
+
+## [2026-03-23] Task: P5.1 - Add langgraph-checkpoint-sqlite Dependency
+
+### Challenge Encountered
+
+**Task specified version:** `langgraph-checkpoint-sqlite (>=0.1.0,<0.2.0)`
+**Issue:** This version doesn't exist on PyPI. The 0.1.x series never existed in the package history.
+
+### Version Investigation
+
+**Available versions on PyPI:**
+- 1.0.0 - 1.0.4 (Aug-Sep 2024)
+- 2.0.0 - 2.0.11 (Oct 2024 - Jul 2025) ← Compatible with langgraph 0.3.x
+- 3.0.0 - 3.0.3 (Oct 2025 - Jan 2026) ← Requires langgraph-checkpoint 3.x
+
+**Compatibility findings:**
+- Current project uses: `langgraph (>=0.3.0,<0.4.0)` which requires `langgraph-checkpoint (>=2.0.10,<3.0.0)`
+- langgraph-checkpoint-sqlite 2.0.11 (latest 2.x) requires: `langgraph-checkpoint (>=2.0.10,<3.0.0)` ✓ Compatible
+- langgraph-checkpoint-sqlite 3.0.0+ requires: `langgraph-checkpoint (>=3,<4.0.0)` ✗ Incompatible with langgraph 0.3.x
+
+### Solution Applied
+
+**File modified:** `backend/pyproject.toml` (line 25)
+- **Before:** none (dependency didn't exist)
+- **After:** `"langgraph-checkpoint-sqlite (>=2.0.0,<3.0.0)"`
+  - Resolves to 2.0.11 (latest patch in 2.x series)
+  - Compatible with langgraph 0.3.x
+  - Provides SQLite-backed checkpoint persistence
+
+### Dependencies Installed
+
+```
+✅ langgraph-checkpoint-sqlite 2.0.11
+   ├─ aiosqlite >=0.20
+   ├─ langgraph-checkpoint >=2.0.21,<3.0.0
+   └─ sqlite-vec >=0.1.6
+```
+
+### Verification Results
+
+```bash
+✓ poetry lock — Updated lock file successfully
+✓ poetry install --no-root — Installed 3 new packages
+✓ poetry show langgraph-checkpoint-sqlite
+  - version: 2.0.11
+  - description: Library with a SQLite implementation of LangGraph checkpoint saver
+```
+
+### Key Learning
+
+**Dependency version specs must be realistic.** When task specs reference versions that don't exist:
+1. Research available versions on PyPI
+2. Identify the version that's compatible with existing constraints
+3. Document the actual version chosen and why (compatibility, latest available)
+4. Update the plan/spec with correct version for future runs
+
+**For Phase 5:** The checkpoint system is now ready:
+- P5.1: ✅ Dependency added (langgraph-checkpoint-sqlite 2.0.11)
+- P5.2: Add config settings for SQLite path
+- P5.3: Create session metadata store
+- P5.5: Initialize checkpointer in app lifespan
+
+### Commands That Work
+
+```bash
+cd backend
+poetry lock && poetry install --no-root
+poetry show langgraph-checkpoint-sqlite
+poetry run python -c "from langgraph_checkpoint_sqlite import SqliteSaver; print('✓')"
+```
