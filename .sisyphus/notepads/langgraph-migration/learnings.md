@@ -1905,3 +1905,26 @@ graph LR
 ### Implementation note
 
 - `chat.message.delta` is intentionally not emitted in this phase (no token-level LLM streaming yet); endpoint emits completion-level chat events only.
+
+## [2026-03-22 00:00] Task: P3.8 - Backend Chat Tests
+
+**What was created:**
+- File: backend/tests/graph/test_intake_graph.py (3 tests)
+- File: backend/tests/graph/test_refinement_graph.py (3 tests)
+- File: backend/tests/api/test_chat_api.py (6 tests)
+
+**Mock patterns used:**
+- Graph tests patch `app.agents.intake.create_model_from_string` / `app.agents.refinement.create_model_from_string` and patch agent `.run` with `AsyncMock(return_value=SimpleNamespace(output=...))`.
+- API tests patch `app.api.chat.get_intake_graph` / `get_refinement_graph` with fake async graph streams and patch `app.api.chat.stream_generation` for deterministic generate-stream SSE output.
+
+**Key test insights:**
+- Verified intake graph emits not-ready vs ready outcomes with correct `extracted_constraints` and `missing_fields`, and preserves conversation across turns via shared `thread_id`.
+- Verified refinement graph returns `updated_cv_dict` plus explanatory `assistant_reply`, and enforces anti-hallucination behavior by rejecting unsupported skills additions.
+- Verified all three chat streaming endpoints return SSE and emit expected event types: `intake.ready`, `result`, and `artifact.cv.updated`.
+
+**Verification passed:**
+- `python3 -m py_compile backend/tests/graph/test_intake_graph.py backend/tests/graph/test_refinement_graph.py backend/tests/api/test_chat_api.py` → syntax OK
+
+**Verification blocked (environment):**
+- `poetry run pytest backend/tests/graph/test_intake_graph.py backend/tests/graph/test_refinement_graph.py backend/tests/api/test_chat_api.py` failed due broken Poetry runtime (missing Homebrew Python 3.13 dylib).
+- `lsp_diagnostics` on changed files reports only `pytest` unresolved import errors (environment/interpreter issue), no code-level syntax errors.
