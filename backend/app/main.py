@@ -1,16 +1,31 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.config import get_settings
 from app.api import parse, generate, pdf, cover_letter, chat
 from app.services.pdf import shutdown_browser
+from app.services.session_store import SessionStore
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle — cleanup Playwright browser on shutdown."""
+    settings = get_settings()
+
+    db_path = Path(settings.langgraph_sqlite_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    checkpointer = AsyncSqliteSaver.from_conn_string(str(db_path))
+    await checkpointer.setup()
+
+    session_store = SessionStore(str(db_path))
+
+    app.state.checkpointer = checkpointer
+    app.state.session_store = session_store
+
     yield
     await shutdown_browser()
 
