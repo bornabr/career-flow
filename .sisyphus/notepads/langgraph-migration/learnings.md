@@ -1696,3 +1696,78 @@ P3.1 enables:
 - Test execution attempts failed due environment limitations:
   - `pytest` not installed on system python
   - Poetry environment references missing Homebrew Python 3.13 dylib
+
+## [2026-03-22] Task: P3.4 - Create Chat LangGraph States
+
+### What Was Created
+
+**File: `backend/app/graph/chat_state.py`** (50 lines)
+- `IntakeState` TypedDict: 8 fields for pre-generation intake conversation
+- `RefinementState` TypedDict: 7 fields for post-generation CV refinement
+
+### Implementation Details
+
+#### IntakeState Fields
+
+1. `messages: Annotated[list[ChatMessage], operator.add]` — Conversation history with reducer
+2. `resume_text: str` — Original resume text
+3. `job_description: str` — Target job description
+4. `user_instructions: str | None` — Optional user instructions
+5. `extracted_constraints: list[str]` — Constraints extracted from conversation
+6. `missing_fields: list[str]` — Fields still needing clarification
+7. `ready_to_generate: bool` — Whether sufficient context gathered
+8. `assistant_reply: str | None` — Latest assistant response
+
+#### RefinementState Fields
+
+1. `messages: Annotated[list[ChatMessage], operator.add]` — Conversation history with reducer
+2. `current_cv_dict: dict[str, Any]` — Current CV data as dict
+3. `resume_text: str` — Original resume text (for anti-hallucination)
+4. `job_description: str` — Target job description (context)
+5. `latest_user_message: str` — User's refinement request
+6. `updated_cv_dict: dict[str, Any] | None` — Modified CV data after refinement
+7. `assistant_reply: str | None` — Assistant explanation of changes
+
+### Key Design Patterns Applied
+
+1. **TypedDict with total=False**: All fields optional (no required fields), matching GenerationState pattern
+2. **Reducer on messages field**: `Annotated[list[ChatMessage], operator.add]` tells LangGraph to APPEND messages, not replace
+3. **Consistent structure**: Follows exact pattern from `backend/app/graph/state.py` (GenerationState)
+4. **Import path**: `from app.schemas.chat import ChatMessage` (not `backend.app`)
+
+### Verification Completed
+
+✅ **Field verification**: All fields match plan specification exactly (8 for IntakeState, 7 for RefinementState)
+✅ **Type hints**: Correct union types (`str | None`, `dict[str, Any] | None`)
+✅ **Reducer pattern**: Both states use `Annotated[list[ChatMessage], operator.add]` for messages field
+✅ **Structure consistency**: Imports, class definitions, docstrings match GenerationState reference pattern
+✅ **Docstrings**: Both classes have comprehensive docstrings with Attributes sections
+✅ **Python syntax**: Valid Python 3.10+ syntax confirmed with py_compile
+
+### Design Rationale
+
+**Why TypedDict (not Pydantic)?**
+- LangGraph requires native Python typing for state management
+- Allows custom reducers via Annotated (Pydantic validation would prevent this)
+- Pattern established in P1.3 (GenerationState)
+
+**Field Classification:**
+
+**IntakeState:**
+- Input fields: `resume_text`, `job_description`, `user_instructions`
+- Accumulator: `messages` (with reducer)
+- Output fields: `ready_to_generate`, `extracted_constraints`, `missing_fields`, `assistant_reply`
+
+**RefinementState:**
+- Input fields: `resume_text`, `job_description`, `latest_user_message`
+- Current state: `current_cv_dict`
+- Accumulator: `messages` (with reducer)
+- Output fields: `updated_cv_dict`, `assistant_reply`
+
+### Ready for P3.5
+
+P3.4 enables:
+- P3.5: Create chat graph nodes (intake and refinement node wrappers)
+- Chat flow orchestration in P3.6
+- Chat endpoint integration in P3.7+
+

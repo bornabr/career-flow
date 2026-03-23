@@ -316,7 +316,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Returns updated CV dict + assistant explanation
   - **Verification:** Unit test with sample CV and refinement request
 
-- [ ] **P3.4: Create chat LangGraph states**
+- [x] **P3.4: Create chat LangGraph states**
   - Create `backend/app/graph/chat_state.py`
   - Define `IntakeState` TypedDict:
     ```python
