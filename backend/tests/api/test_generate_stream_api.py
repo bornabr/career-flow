@@ -162,10 +162,10 @@ async def test_stream_endpoint_returns_event_stream_response(client, mock_cv):
         # Make request
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
-                "review_mode": "false",
+                "review_mode": False,
                 "model_name": "google:gemini-2.5-pro",
                 "api_key": "test-api-key",
             }
@@ -202,7 +202,7 @@ async def test_stream_endpoint_sse_format(client, mock_cv):
         
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
                 "model_name": "google:gemini-2.5-pro",
@@ -250,10 +250,10 @@ async def test_stream_endpoint_review_mode(
         # Make request with review_mode=true
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
-                "review_mode": "true",
+                "review_mode": True,
                 "model_name": "google:gemini-2.5-pro",
                 "api_key": "test-api-key",
             }
@@ -295,10 +295,10 @@ async def test_stream_endpoint_reviewer_failure(
         
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
-                "review_mode": "true",
+                "review_mode": True,
                 "model_name": "google:gemini-2.5-pro",
                 "api_key": "test-api-key",
             }
@@ -325,7 +325,7 @@ async def test_stream_endpoint_error_handling(client):
         
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
                 "model_name": "google:gemini-2.5-pro",
@@ -369,7 +369,7 @@ async def test_stream_endpoint_response_headers(client, mock_cv):
         
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
                 "model_name": "google:gemini-2.5-pro",
@@ -404,7 +404,7 @@ async def test_stream_endpoint_result_event_contains_cv_data(client, mock_cv):
         
         response = client.post(
             "/api/generate/stream",
-            data={
+            json={
                 "resume_text": SAMPLE_RESUME,
                 "job_description": SAMPLE_JOB_DESCRIPTION,
                 "model_name": "google:gemini-2.5-pro",

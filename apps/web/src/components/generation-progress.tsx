@@ -35,8 +35,8 @@ export function GenerationProgress() {
         {/* Pipeline steps */}
         <div className="space-y-2">
           {/* Completed steps */}
-          {completedSteps.map((step) => (
-            <div key={step} className="flex items-center gap-2">
+          {completedSteps.map((step, idx) => (
+            <div key={`${step}-${idx}`} className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-600" />
               <span className="text-sm">{step}</span>
             </div>
@@ -65,7 +65,7 @@ export function GenerationProgress() {
                     <p className="text-sm text-muted-foreground">
                       {memo.summary}
                     </p>
-                    {memo.suggestions.length > 0 && (
+                    {memo.suggestions && memo.suggestions.length > 0 && (
                       <ul className="text-xs text-muted-foreground list-disc list-inside">
                         {memo.suggestions.map((s, i) => (
                           <li key={i}>{s}</li>

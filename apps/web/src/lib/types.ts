@@ -102,6 +102,32 @@ export interface ReviewApprovalPayload {
   consensus_score: number;
 }
 
+// ─── Session types ───────────────────────────────
+
+export interface SessionSummary {
+  thread_id: string;
+  title: string;
+  mode: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  latest_assistant_message: string | null;
+  has_cv: boolean;
+  requires_api_key_on_resume: boolean;
+}
+
+export interface SessionDetail extends SessionSummary {
+  messages: Record<string, unknown>[];
+  cv_data: Record<string, unknown> | null;
+  review_panel: Record<string, unknown> | null;
+  pending_interrupt: Record<string, unknown> | null;
+}
+
+export interface SessionListResponse {
+  items: SessionSummary[];
+  next_cursor: string | null;
+}
+
 // ─── Helpers ─────────────────────────────────────
 
 export function createEmptyCV(): CV {

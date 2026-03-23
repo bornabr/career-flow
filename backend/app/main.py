@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.config import get_settings
-from app.api import parse, generate, pdf, cover_letter, chat
+from app.api import parse, generate, pdf, cover_letter, chat, sessions
 from app.services.pdf import shutdown_browser
 from app.services.session_store import SessionStore
 
@@ -18,15 +18,15 @@ async def lifespan(app: FastAPI):
     db_path = Path(settings.langgraph_sqlite_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    checkpointer = AsyncSqliteSaver.from_conn_string(str(db_path))
-    await checkpointer.setup()
+    async with AsyncSqliteSaver.from_conn_string(str(db_path)) as checkpointer:
+        await checkpointer.setup()
 
-    session_store = SessionStore(str(db_path))
+        session_store = SessionStore(str(db_path))
 
-    app.state.checkpointer = checkpointer
-    app.state.session_store = session_store
+        app.state.checkpointer = checkpointer
+        app.state.session_store = session_store
 
-    yield
+        yield
     await shutdown_browser()
 
 
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(pdf.router, prefix="/api", tags=["pdf"])
     app.include_router(cover_letter.router, prefix="/api", tags=["cover-letter"])
     app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+    app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 
     @app.get("/health")
     async def health_check():

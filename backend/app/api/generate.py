@@ -9,7 +9,7 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -129,68 +129,54 @@ async def generate_cv(request: GenerateRequest):
     )
 
 
+class StreamGenerateRequest(BaseModel):
+    """Request body for streaming CV generation."""
+
+    resume_text: str
+    job_description: str
+    user_instructions: str | None = None
+    api_key: str | None = None
+    model_name: str | None = None
+    review_mode: bool = False
+    review_model: str | None = None
+    run_hallucination_check: bool = False
+    thread_id: str | None = None
+
+
 @router.post("/generate/stream")
-async def generate_cv_stream(
-    resume_text: str = Form(...),
-    job_description: str = Form(...),
-    user_instructions: str | None = Form(None),
-    review_mode: bool = Form(False),
-    run_hallucination_check: bool = Form(False),
-    model_name: str | None = Form(None),
-    api_key: str | None = Form(None),
-    review_model_name: str | None = Form(None),
-    review_api_key: str | None = Form(None),
-    thread_id: str | None = Form(None),
-):
+async def generate_cv_stream(request: StreamGenerateRequest, http_request: Request):
     """Stream CV generation progress via Server-Sent Events.
     
     Same functionality as /api/generate but returns real-time progress events
-    instead of blocking until completion. Frontend uses EventSource or fetch
-    to consume the text/event-stream response.
-    
-    Args:
-        resume_text: Resume text input
-        job_description: Target job description
-        user_instructions: Optional custom instructions from user
-        review_mode: Enable review committee pipeline
-        run_hallucination_check: Enable AI hallucination validation
-        model_name: Model for generation (e.g., 'google:gemini-2.5-pro')
-        api_key: Optional API key override
-        review_model_name: Optional model for reviewers
-        review_api_key: Optional API key override for review model
-        thread_id: Optional thread ID for session persistence/resuming
-        
-    Returns:
-        StreamingResponse with text/event-stream media type
+    instead of blocking until completion.
     """
     settings = get_settings()
     
     # Resolve main model
-    resolved_model = model_name or settings.model_name
+    resolved_model = request.model_name or settings.model_name
     provider = resolved_model.split(":")[0] if ":" in resolved_model else "openai"
-    resolved_api_key = _resolve_api_key(settings, provider, api_key)
+    resolved_api_key = _resolve_api_key(settings, provider, request.api_key)
     
     # Optional review model resolution
-    if review_mode:
-        resolved_review_model = review_model_name or settings.default_review_model
+    if request.review_mode:
+        resolved_review_model = request.review_model or settings.default_review_model
         review_provider = resolved_review_model.split(":")[0] if ":" in resolved_review_model else "openai"
-        resolved_review_api_key = _resolve_api_key(settings, review_provider, review_api_key)
+        resolved_review_api_key = _resolve_api_key(settings, review_provider, request.api_key)
     else:
         resolved_review_model = None
         resolved_review_api_key = None
     
     # Generate unique thread_id if not provided
-    if not thread_id:
-        thread_id = str(uuid.uuid4())
+    thread_id = request.thread_id or str(uuid.uuid4())
     
     # Build initial state
     state: GenerationState = {
         "request_id": thread_id,
-        "resume_text": resume_text,
-        "job_description": job_description,
-        "user_instructions": user_instructions,
-        "review_mode": review_mode,
-        "run_hallucination_check": run_hallucination_check,
+        "resume_text": request.resume_text,
+        "job_description": request.job_description,
+        "user_instructions": request.user_instructions,
+        "review_mode": request.review_mode,
+        "run_hallucination_check": request.run_hallucination_check,
     }
     
     # Build runtime config
@@ -210,7 +196,7 @@ async def generate_cv_stream(
     }
     
     # Get graph and stream
-    graph = get_generation_graph()
+    graph = get_generation_graph(checkpointer=http_request.app.state.checkpointer)
     
     return StreamingResponse(
         stream_generation(state, config, graph),

@@ -6,6 +6,7 @@ import { CVEditor } from "@/components/cv-editor";
 import { PreviewPanel } from "@/components/preview-panel";
 import { ChatWorkspace } from "@/components/chat-workspace";
 import { ArtifactPanel } from "@/components/artifact-panel";
+import { SessionHistorySidebar } from "@/components/session-history-sidebar";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -39,12 +40,19 @@ export default function Home() {
       <main className="flex flex-1 overflow-hidden">
         {uiMode === "assistant" ? (
           <div className="flex w-full">
-            {/* Left: Chat */}
-            <div className="w-1/2 border-r">
+            {/* Left: Session History */}
+            <div className="hidden w-[20%] min-w-[200px] md:block">
+              <SessionHistorySidebar />
+            </div>
+            {/* Center: Chat */}
+            <div className="w-full border-r md:w-[40%]">
+              <div className="flex items-center gap-2 border-b p-2 md:hidden">
+                <SessionHistorySidebar />
+              </div>
               <ChatWorkspace />
             </div>
             {/* Right: Artifact */}
-            <div className="w-1/2">
+            <div className="hidden w-[40%] md:block">
               <ArtifactPanel />
             </div>
           </div>

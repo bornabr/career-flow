@@ -234,7 +234,21 @@ export function UploadStep() {
             setActiveStep(null);
           },
           onReviewMemo: (data: unknown) => {
-            addLiveReviewMemo(data as ReviewMemo);
+            const raw = data as {
+              reviewer_role: string;
+              memo: {
+                overall_score: number;
+                strengths: string[];
+                weaknesses: string[];
+                priority_changes: string[];
+              };
+            };
+            addLiveReviewMemo({
+              reviewer: raw.reviewer_role,
+              score: raw.memo.overall_score,
+              summary: raw.memo.strengths?.[0] ?? "",
+              suggestions: raw.memo.priority_changes ?? [],
+            });
           },
           onValidationCompleted: (data: unknown) => {
             const payload = data as { ats_issues: string[]; hallucination_warnings: string[] };
@@ -248,7 +262,8 @@ export function UploadStep() {
             toast.success("CV generated. You can now refine every section.");
           },
           onError: (data: unknown) => {
-            setGenerationError((data as { error: string }).error);
+            const payload = data as { message?: string; error?: string };
+            setGenerationError(payload.message || payload.error || "Generation failed");
             setRunStatus("failed");
           },
           onRunCompleted: (data: unknown) => {

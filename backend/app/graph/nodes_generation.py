@@ -22,7 +22,6 @@ from app.graph.events import (
 )
 from app.graph.runtime import GraphRuntimeConfig
 from app.graph.state import GenerationState
-from app.schemas.review import ReviewMemo
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +48,10 @@ async def tailor_node(state: GenerationState, config: RunnableConfig) -> dict[st
     
     emit_step_completed(writer, "generation")
     
+    cv_dict = cv.model_dump(mode="json")
     return {
-        "draft_cv": cv,
-        "current_cv_dict": cv.model_dump(mode="json"),
+        "draft_cv": cv_dict,
+        "current_cv_dict": cv_dict,
     }
 
 
@@ -77,9 +77,10 @@ async def hr_review_node(state: GenerationState, config: RunnableConfig) -> dict
             api_key=review_key,
         )
         item_keys = [f"hr:{i}" for i in range(len(review.priority_changes))]
-        emit_review_memo(writer, "hr", review.model_dump(), item_keys)
+        review_dict = review.model_dump(mode="json")
+        emit_review_memo(writer, "hr", review_dict, item_keys)
         emit_step_completed(writer, "hr_review")
-        return {"reviews": [review]}
+        return {"reviews": [review_dict]}
     except Exception as exc:
         logger.error("HR reviewer failed: %s", exc)
         emit_review_failed(writer, "hr", str(exc))
@@ -108,9 +109,10 @@ async def technical_review_node(state: GenerationState, config: RunnableConfig) 
             api_key=review_key,
         )
         item_keys = [f"technical:{i}" for i in range(len(review.priority_changes))]
-        emit_review_memo(writer, "technical", review.model_dump(), item_keys)
+        review_dict = review.model_dump(mode="json")
+        emit_review_memo(writer, "technical", review_dict, item_keys)
         emit_step_completed(writer, "technical_review")
-        return {"reviews": [review]}
+        return {"reviews": [review_dict]}
     except Exception as exc:
         logger.error("Technical reviewer failed: %s", exc)
         emit_review_failed(writer, "technical", str(exc))
@@ -139,9 +141,10 @@ async def ats_review_node(state: GenerationState, config: RunnableConfig) -> dic
             api_key=review_key,
         )
         item_keys = [f"ats:{i}" for i in range(len(review.priority_changes))]
-        emit_review_memo(writer, "ats", review.model_dump(), item_keys)
+        review_dict = review.model_dump(mode="json")
+        emit_review_memo(writer, "ats", review_dict, item_keys)
         emit_step_completed(writer, "ats_review")
-        return {"reviews": [review]}
+        return {"reviews": [review_dict]}
     except Exception as exc:
         logger.error("ATS reviewer failed: %s", exc)
         emit_review_failed(writer, "ats", str(exc))
@@ -168,7 +171,7 @@ async def hallucination_check_node(state: GenerationState, config: RunnableConfi
             api_key=runtime.api_key,
         )
         emit_step_completed(writer, "hallucination_check")
-        return {"hallucination_report": report}
+        return {"hallucination_report": report.model_dump(mode="json")}
     except Exception as exc:
         logger.error("Hallucination checker failed: %s", exc)
         emit_step_completed(writer, "hallucination_check")
@@ -176,31 +179,28 @@ async def hallucination_check_node(state: GenerationState, config: RunnableConfi
 
 
 async def review_apply_node(state: GenerationState) -> dict[str, Any]:
-    reviews = state.get("reviews", [])
+    reviews: list[dict[str, Any]] = state.get("reviews", [])
     review_decisions = state.get("review_decisions")
 
     if not reviews:
         return {"filtered_reviews": []}
 
     if not review_decisions:
-        return {"filtered_reviews": [memo.model_copy(deep=True) for memo in reviews]}
+        return {"filtered_reviews": [{**memo} for memo in reviews]}
 
-    filtered_reviews: list[ReviewMemo] = []
+    filtered_reviews: list[dict[str, Any]] = []
     for memo in reviews:
         accepted_priority_changes = [
             priority_change
-            for index, priority_change in enumerate(memo.priority_changes)
-            if review_decisions.get(f"{memo.reviewer_role}:{index}", False)
+            for index, priority_change in enumerate(memo["priority_changes"])
+            if review_decisions.get(f"{memo['reviewer_role']}:{index}", False)
         ]
 
         if not accepted_priority_changes:
             continue
 
         filtered_reviews.append(
-            memo.model_copy(
-                update={"priority_changes": accepted_priority_changes},
-                deep=True,
-            )
+            {**memo, "priority_changes": accepted_priority_changes}
         )
 
     return {"filtered_reviews": filtered_reviews}
@@ -218,11 +218,15 @@ async def synthesis_node(state: GenerationState, config: RunnableConfig) -> dict
     
     runtime: GraphRuntimeConfig = config["configurable"]["runtime"]
     filtered_state = await review_apply_node(state)
-    filtered_reviews: list[ReviewMemo] = filtered_state["filtered_reviews"]
+    filtered_reviews: list[dict[str, Any]] = filtered_state["filtered_reviews"]
+    
+    # Reconstruct Pydantic ReviewMemo objects for the synthesis agent prompt builder
+    from app.schemas.review import ReviewMemo
+    review_memos = [ReviewMemo.model_validate(r) for r in filtered_reviews]
     
     refined_cv = await synthesize_cv(
         cv_data=state["current_cv_dict"],
-        reviews=filtered_reviews,
+        reviews=review_memos,
         resume_text=state["resume_text"],
         job_description=state["job_description"],
         model_name=runtime.model_name,
@@ -266,7 +270,7 @@ async def validate_node(state: GenerationState, config: RunnableConfig) -> dict[
         "cv_data": result["cv_data"],
         "ats_issues": result["ats_issues"],
         "hallucination_warnings": result["hallucination_warnings"],
-        "review_panel": review_panel.model_dump(mode="json") if review_panel else None,
+        "review_panel": review_panel,
     }
     
     emit_step_completed(writer, "validation")

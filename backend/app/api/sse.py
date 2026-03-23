@@ -54,19 +54,24 @@ async def stream_generation(
             config=config,
             stream_mode=["custom", "updates"],
         ):
-            # Custom events from nodes (via get_stream_writer)
-            if chunk.get("type") == "custom":
-                event_data = chunk.get("data", {})
-                yield format_sse(event_data)
-            
-            # State updates from node completions
-            elif chunk.get("type") == "updates":
-                # Format as node completion events
-                for node_name, node_output in chunk.get("data", {}).items():
-                    yield format_sse({
-                        "type": "node.completed",
-                        "data": {"node_name": node_name}
-                    })
+            # With stream_mode=["custom", "updates"], chunks are tuples (namespace, value)
+            if not isinstance(chunk, tuple) or len(chunk) != 2:
+                continue
+
+            ns, value = chunk
+
+            if ns == "custom":
+                # Custom events from nodes (via get_stream_writer)
+                yield format_sse(value)
+
+            elif ns == "updates":
+                # State updates from node completions — value is dict of {node_name: output}
+                if isinstance(value, dict):
+                    for node_name in value:
+                        yield format_sse({
+                            "type": "node.completed",
+                            "data": {"node_name": node_name}
+                        })
     
     except Exception as exc:
         logger.error(f"Stream generation error: {exc}")

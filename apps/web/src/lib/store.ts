@@ -8,6 +8,7 @@ import type {
   ReviewMemo,
   ChatMessage,
   ReviewApprovalPayload,
+  SessionSummary,
 } from "@/lib/types";
 
 // Re-export types from shared definitions for convenience
@@ -148,6 +149,23 @@ interface AppState {
   reviewSubmitHandler: (() => Promise<void>) | null;
   setReviewSubmitHandler: (handler: (() => Promise<void>) | null) => void;
 
+  // ─── Session history ────────────────────────────
+  sessionSummaries: SessionSummary[];
+  setSessionSummaries: (summaries: SessionSummary[]) => void;
+  prependSessionSummary: (summary: SessionSummary) => void;
+
+  activeSessionId: string | null;
+  setActiveSessionId: (id: string | null) => void;
+
+  activeSessionStatus: string | null;
+  setActiveSessionStatus: (status: string | null) => void;
+
+  requiresApiKeyOnResume: boolean;
+  setRequiresApiKeyOnResume: (requires: boolean) => void;
+
+  sessionCursor: string | null;
+  setSessionCursor: (cursor: string | null) => void;
+
   // ─── Reset ──────────────────────────────────────
   reset: () => void;
 }
@@ -190,6 +208,11 @@ const initialState = {
   isAwaitingReviewApproval: false,
   currentThreadId: null as string | null,
   reviewSubmitHandler: null as (() => Promise<void>) | null,
+  sessionSummaries: [] as SessionSummary[],
+  activeSessionId: null as string | null,
+  activeSessionStatus: null as string | null,
+  requiresApiKeyOnResume: false,
+  sessionCursor: null as string | null,
 };
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -276,6 +299,16 @@ export const useAppStore = create<AppState>()((set) => ({
     set({ isAwaitingReviewApproval }),
   setCurrentThreadId: (currentThreadId) => set({ currentThreadId }),
   setReviewSubmitHandler: (reviewSubmitHandler) => set({ reviewSubmitHandler }),
+
+  setSessionSummaries: (sessionSummaries) => set({ sessionSummaries }),
+  prependSessionSummary: (summary) =>
+    set((state) => ({
+      sessionSummaries: [summary, ...state.sessionSummaries.filter((s) => s.thread_id !== summary.thread_id)],
+    })),
+  setActiveSessionId: (activeSessionId) => set({ activeSessionId }),
+  setActiveSessionStatus: (activeSessionStatus) => set({ activeSessionStatus }),
+  setRequiresApiKeyOnResume: (requiresApiKeyOnResume) => set({ requiresApiKeyOnResume }),
+  setSessionCursor: (sessionCursor) => set({ sessionCursor }),
 
   reset: () => set(initialState),
 }));

@@ -9,7 +9,7 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "dev:web": "pnpm --filter @career-flow/web dev",
-    "dev:backend": "pnpm --filter @career-flow/web dev & cd backend && poetry run uvicorn app.main:app --reload --port 8000",
+    "dev:backend": "export PATH=\"$HOME/.local/bin:$PATH\"; pnpm --filter @career-flow/web dev & cd backend && poetry run uvicorn app.main:app --reload --port 8000",
     "build:web": "pnpm --filter @career-flow/web build"
   },
   "devDependencies": {

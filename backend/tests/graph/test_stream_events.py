@@ -304,7 +304,7 @@ async def test_tailor_node_emits_step_events(
         
         # Verify result
         assert "draft_cv" in result
-        assert result["draft_cv"].name == "John Doe"
+        assert result["draft_cv"]["name"] == "John Doe"
 
 
 @pytest.mark.asyncio
@@ -512,7 +512,7 @@ async def test_synthesis_node_emits_step_events(
             "resume_text": SAMPLE_RESUME,
             "job_description": SAMPLE_JOB_DESCRIPTION,
             "current_cv_dict": {"name": "John"},
-            "reviews": [sample_review_memo],
+            "reviews": [sample_review_memo.model_dump(mode="json")],
         }
         
         result = await synthesis_node(state, mock_config)

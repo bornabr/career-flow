@@ -1,5 +1,5 @@
 import { parseSSE, EventHandlers } from "./sse";
-import type { ChatMessage } from "./types";
+import type { ChatMessage, SessionListResponse, SessionDetail } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -81,7 +81,10 @@ export async function streamGenerateCV(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Failed to generate CV (streaming)");
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((e: { msg?: string }) => e.msg || JSON.stringify(e)).join("; ")
+      : err.detail || "Failed to generate CV (streaming)";
+    throw new Error(detail);
   }
 
   await parseSSE(res, handlers);
@@ -336,4 +339,38 @@ export async function streamReviewResume(
   }
 
   await parseSSE(res, handlers);
+}
+
+// ─── Sessions ────────────────────────────────────
+
+export async function listSessions(
+  limit?: number,
+  cursor?: string | null
+): Promise<SessionListResponse> {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+  if (cursor) params.set("cursor", cursor);
+
+  const qs = params.toString();
+  const url = `${API_BASE}/api/sessions${qs ? `?${qs}` : ""}`;
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to list sessions");
+  }
+
+  return res.json();
+}
+
+export async function getSession(threadId: string): Promise<SessionDetail> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(threadId)}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to get session");
+  }
+
+  return res.json();
 }

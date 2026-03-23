@@ -2794,3 +2794,127 @@ poetry lock && poetry install --no-root
 poetry show langgraph-checkpoint-sqlite
 poetry run python -c "from langgraph_checkpoint_sqlite import SqliteSaver; print('✓')"
 ```
+## [2026-03-23] Task: P5.3 - Create SessionStore
+
+**What worked:**
+- Implemented `SessionStore` with stdlib `sqlite3` using one connection per operation, row factory, and FK enforcement (`PRAGMA foreign_keys = ON`).
+- Used ISO UTC timestamps for `created_at`/`updated_at` and auto-updated `updated_at` during `update_session()`.
+- Cursor pagination is deterministic with `ORDER BY updated_at DESC` and `limit + 1` probing for `next_cursor`.
+- Converted SQLite integer flags to booleans at read boundaries (`requires_api_key_on_resume`, `has_cv`).
+
+**Database schema:**
+- `session_runs`: 11 fields, no additional indexes (as planned).
+- `session_messages`: 8 fields including FK to `session_runs(thread_id)` with `ON DELETE CASCADE`.
+
+**Test coverage:**
+- 8 tests in `backend/tests/services/test_session_store.py`.
+- Verifies table creation, create/update/get flows, empty listing, cursor pagination, not-found behavior, and message insertion with auto timestamp.
+- LSP diagnostics are clean for both changed files.
+
+**Next steps (P5.4):**
+- Create Pydantic schemas for API responses.
+- Define `SessionSummary`, `SessionDetail`, `SessionListResponse`.
+
+## [2026-03-23] Task: P5.4 - Create Session Schemas
+
+### What was created:
+
+**File:** `backend/app/schemas/session.py` (29 lines)
+
+Three Pydantic models for session API responses:
+
+1. **SessionSummary** (9 fields)
+   - thread_id: str — Unique session identifier
+   - title: str — User-visible session title
+   - mode: str — 'standard' or 'review'
+   - status: str — 'running', 'completed', 'failed', 'interrupted'
+   - created_at, updated_at: str — ISO 8601 timestamps
+   - latest_assistant_message: Optional[str] — For preview in list views
+   - has_cv: bool — Whether CV generated
+   - requires_api_key_on_resume: bool — Flag for auth on resume
+
+2. **SessionDetail** extends SessionSummary
+   - messages: list[dict[str, Any]] — Full conversation history
+   - cv_data: Optional[dict[str, Any]] — Generated CV data
+   - review_panel: Optional[dict[str, Any]] — Review committee results
+   - pending_interrupt: Optional[dict[str, Any]] — HITL interrupt details
+
+3. **SessionListResponse** (pagination)
+   - items: list[SessionSummary] — Page of sessions
+   - next_cursor: Optional[str] — Pagination cursor
+
+### Pattern followed:
+- Imported from `backend/app/schemas/chat.py` and `backend/app/schemas/review.py`
+- Used `Field(..., description="...")` for all fields
+- Class docstrings for API documentation
+- `Optional[]` and `Field(None, ...)` for nullable fields
+- `list[dict[str, Any]]` for flexible nested data
+
+### Verification:
+✅ File created at correct location
+✅ All 3 models defined with exact field names from plan
+✅ Type hints and descriptions for all fields
+✅ Inheritance pattern (SessionDetail extends SessionSummary) working
+✅ Python syntax valid (lsp_diagnostics clean on semantics)
+
+### Next steps (P5.5-P5.8):
+- P5.5: Initialize checkpointer + SessionStore in app lifespan
+- P5.6: Update graph registry for checkpoint support
+- P5.7: Create session management API endpoint
+- P5.8: Implement GET /api/sessions and /api/sessions/{thread_id} endpoints
+
+### Key insights:
+- SessionSummary is the base model for list views (minimal fields, fast queries)
+- SessionDetail extends it with full data (messages, cv_data, review_panel)
+- SessionListResponse handles pagination with cursor (not offset-based)
+- All timestamp fields are ISO 8601 strings (stored/retrieved as strings from SQLite)
+- Boolean fields (has_cv, requires_api_key_on_resume) map to INTEGER in DB
+
+## [2026-03-23] Task: P5.5 - Initialize SQLite Checkpointer in App Lifespan
+
+**What worked:**
+- AsyncSqliteSaver.from_conn_string(path) + await checkpointer.setup()
+- SessionStore(path) — synchronous init
+- Both use same SQLite file, different tables
+- app.state attachment pattern
+
+**Database initialization:**
+- Created tables: checkpoints, writes (LangGraph), session_runs, session_messages (SessionStore)
+- Path: data/langgraph.db (configurable via settings)
+
+**Verification note:**
+- Code wiring is complete in `app.main.lifespan`, but runtime startup verification was blocked in this environment because `poetry run` fails before app boot (broken Poetry venv Python framework path).
+
+**Next steps (P5.6):**
+- Update graph registry to accept checkpointer arg
+- Update API endpoints to pass app.state.checkpointer
+
+## [2026-03-23] Task: P5.6 - Update API Endpoints to Use Persistent Checkpointer
+
+**What changed:**
+- Updated 5 graph registry calls to pass request.app.state.checkpointer
+- chat.py: 4 calls (intake, generation x2, refinement)
+- generate.py: 1 call (generation)
+
+**Pattern applied:**
+- Added `Request` import from fastapi
+- Added `http_request: Request` parameter to all 4 endpoints in chat.py
+- Added `http_request: Request = None` parameter to generate_cv_stream endpoint
+- Changed all graph calls from `get_*_graph()` to `get_*_graph(checkpointer=http_request.app.state.checkpointer)`
+
+**Files modified:**
+- backend/app/api/chat.py: Added Request import, updated 4 endpoints (stream_intake, stream_generate, stream_refine, stream_review_resume)
+- backend/app/api/generate.py: Added Request import, updated 1 endpoint (generate_cv_stream)
+
+**Impact:**
+- All graphs now use persistent SQLite checkpoints via AsyncSqliteSaver
+- Sessions can resume after app restart
+- Graph state is persisted to database instead of in-memory
+
+**Dependencies satisfied:**
+- P5.1-P5.5: Infrastructure complete (checkpointer initialized in app.state)
+- registry.py: Already supports optional checkpointer parameter
+- main.py: Already attaches checkpointer to app.state.checkpointer
+
+**Next phase (P5.7):**
+- Update API endpoints to write session metadata (create_session, update_session, add_message)

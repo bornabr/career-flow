@@ -17,10 +17,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from langgraph.checkpoint.base import interrupt  # pyright: ignore[reportMissingImports]
 from langgraph.config import get_stream_writer  # pyright: ignore[reportMissingImports]
 from langgraph.graph import StateGraph, END  # pyright: ignore[reportMissingImports]
-from langgraph.types import Send  # pyright: ignore[reportMissingImports]
+from langgraph.types import Send, interrupt  # pyright: ignore[reportMissingImports]
 
 from app.graph.events import emit_interrupt_pending
 from app.graph.review_normalization import normalize_review_memo
@@ -34,7 +33,7 @@ from app.graph.nodes_generation import (
     synthesis_node,
     validate_node,
 )
-from app.schemas.review import ReviewPanelResult, InteractiveReviewMemo, ReviewApprovalPayload
+from app.schemas.review import ReviewApprovalPayload
 
 
 def build_generation_graph() -> StateGraph:
@@ -66,25 +65,24 @@ def build_generation_graph() -> StateGraph:
     async def review_join(state: GenerationState) -> dict[str, Any]:
         """Fan-in node that waits for all parallel reviewers and constructs review_panel.
         
-        After all reviewers complete, this node aggregates their ReviewMemos,
-        calculates consensus score, and creates the ReviewPanelResult for the API response.
-        This follows the same logic as the original pipeline's review orchestration.
+        After all reviewers complete, this node aggregates their ReviewMemo dicts,
+        calculates consensus score, and creates the review_panel dict for the API response.
         """
         reviews = state.get("reviews", [])
         hallucination_report = state.get("hallucination_report")
         
         # Calculate consensus score from successful reviews
         if reviews and len(reviews) > 0:
-            consensus_score = sum(r.overall_score for r in reviews) / len(reviews)
+            consensus_score = sum(r["overall_score"] for r in reviews) / len(reviews)
         else:
             consensus_score = 0.0
         
-        # Construct review_panel matching original pipeline structure
-        review_panel = ReviewPanelResult(
-            reviews=reviews,
-            hallucination_report=hallucination_report,
-            consensus_score=round(consensus_score, 1),
-        )
+        # Construct review_panel as plain dict
+        review_panel = {
+            "reviews": reviews,
+            "hallucination_report": hallucination_report,
+            "consensus_score": round(consensus_score, 1),
+        }
         
         return {"review_panel": review_panel}
     
@@ -94,19 +92,19 @@ def build_generation_graph() -> StateGraph:
         reviews = state.get("reviews", [])
         hallucination_report = state.get("hallucination_report")
 
-        interactive_reviews: list[InteractiveReviewMemo] = [
-            normalize_review_memo(memo, memo.reviewer_role)
+        interactive_reviews: list[dict[str, Any]] = [
+            normalize_review_memo(memo, memo["reviewer_role"])
             for memo in reviews
         ]
 
         if reviews and len(reviews) > 0:
-            consensus_score = sum(r.overall_score for r in reviews) / len(reviews)
+            consensus_score = sum(r["overall_score"] for r in reviews) / len(reviews)
         else:
             consensus_score = 0.0
 
         payload = ReviewApprovalPayload(
             interactive_reviews=interactive_reviews,
-            hallucination_report=hallucination_report.model_dump() if hallucination_report else None,
+            hallucination_report=hallucination_report,
             consensus_score=round(consensus_score, 1),
         )
         payload_dict = payload.model_dump(mode="json")

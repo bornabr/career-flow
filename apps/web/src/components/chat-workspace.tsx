@@ -8,6 +8,7 @@ import {
   streamIntakeChat,
   streamRefinementChat,
   streamReviewResume,
+  getSession,
 } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import type { CV, ChatMessage, ReviewApprovalPayload } from "@/lib/types";
@@ -62,7 +63,80 @@ export function ChatWorkspace() {
     currentThreadId,
     setCurrentThreadId,
     setReviewSubmitHandler,
+    activeSessionId,
+    setActiveSessionId,
+    setActiveSessionStatus,
+    setRequiresApiKeyOnResume,
+    setChatMessages,
   } = useAppStore();
+
+  // Hydrate from session history when activeSessionId changes
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const detail = await getSession(activeSessionId);
+        if (cancelled) return;
+
+        // Restore messages
+        const restoredMessages: ChatMessage[] = (detail.messages ?? []).map(
+          (m: Record<string, unknown>) => ({
+            id: (m.message_id ?? m.id ?? crypto.randomUUID()) as string,
+            role: (m.role ?? "assistant") as "user" | "assistant" | "system",
+            content: (m.content ?? "") as string,
+            kind: (m.kind ?? "text") as "text" | "artifact",
+            timestamp: new Date((m.timestamp as string) ?? new Date().toISOString()),
+          })
+        );
+        setChatMessages(restoredMessages);
+
+        // Restore CV data
+        if (detail.cv_data) {
+          setCvData(detail.cv_data as unknown as CV);
+        }
+
+        // Restore thread ID
+        setCurrentThreadId(activeSessionId);
+        setActiveSessionStatus(detail.status);
+        setRequiresApiKeyOnResume(detail.requires_api_key_on_resume);
+
+        // Determine chat phase from session state
+        if (detail.status === "interrupted" && detail.pending_interrupt) {
+          setPendingReviewApproval(detail.pending_interrupt as unknown as ReviewApprovalPayload);
+          setIsAwaitingReviewApproval(true);
+          setChatPhase("generation");
+          setArtifactTab("reviews");
+          setAssistantStatus("awaiting_input");
+        } else if (detail.has_cv) {
+          setChatPhase("refinement");
+          setAssistantStatus("idle");
+        } else {
+          setChatPhase("intake");
+          setAssistantStatus("idle");
+        }
+      } catch {
+        toast.error("Failed to load session");
+      }
+    };
+
+    void hydrate();
+    return () => { cancelled = true; };
+  }, [
+    activeSessionId,
+    setActiveSessionStatus,
+    setAssistantStatus,
+    setArtifactTab,
+    setChatMessages,
+    setChatPhase,
+    setCurrentThreadId,
+    setCvData,
+    setIsAwaitingReviewApproval,
+    setPendingReviewApproval,
+    setRequiresApiKeyOnResume,
+  ]);
 
   const handleSendMessage = useCallback(async () => {
     const trimmedInput = chatInput.trim();
