@@ -1659,3 +1659,40 @@ P3.1 enables:
   - Poetry venv references missing Homebrew Python path (`python@3.13/3.13.3` dylib missing)
   - System python lacks backend deps (`pytest`, `pydantic_ai`)
 - Result: runtime import/test execution blocked despite successful file creation and LSP shape checks.
+
+## [2026-03-22] Task: P3.3 - Create Refinement Agent
+
+### What was created
+
+- `backend/app/agents/refinement.py`
+  - Added module-level `refinement_agent = Agent("test", output_type=RefinementResult, system_prompt=REFINEMENT_SYSTEM_PROMPT)`.
+  - Added `build_refinement_prompt(...)` that injects current CV JSON, resume text, job description, and latest user message.
+  - Added explicit anti-hallucination instruction in turn prompt: "Only use information from the original resume text. Do not add unsupported facts."
+  - Added `run_refinement_turn(...)` using runtime model injection via `create_model_from_string(...)` and `await refinement_agent.run(prompt, model=model)`.
+
+- `backend/tests/agents/test_refinement.py`
+  - Added async unit tests following the intake test pattern (`AsyncMock` + `SimpleNamespace(output=...)`).
+  - Covers requested update behavior: summary changes while unmodified fields are preserved.
+  - Covers assistant explanation behavior: verifies assistant_reply communicates what changed.
+  - Covers anti-hallucination behavior: unsupported requested fact is not introduced and prompt includes safety constraint.
+
+### Patterns confirmed
+
+1. Refinement agent matches existing pydantic-ai module pattern:
+   - placeholder model at module load (`"test"`)
+   - runtime override via `run(model=...)`
+
+2. Prompt layering is useful for safety-critical turns:
+   - global behavior in `REFINEMENT_SYSTEM_PROMPT`
+   - per-turn factual guardrails in `build_refinement_prompt(...)`
+
+3. Structured output contract for iterative edits is stable:
+   - `assistant_reply` can explain edits or request clarification
+   - `updated_cv_dict` carries the full post-edit artifact for caller-side persistence
+
+### Verification notes
+
+- LSP diagnostics on changed files report environment missing-import errors (`pydantic_ai`, `pytest`) and related unknown-type warnings due unavailable backend deps in this runtime.
+- Test execution attempts failed due environment limitations:
+  - `pytest` not installed on system python
+  - Poetry environment references missing Homebrew Python 3.13 dylib

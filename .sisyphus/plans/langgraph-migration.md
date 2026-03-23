@@ -309,7 +309,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Returns `extracted_constraints` and `missing_fields`
   - **Verification:** Unit test with mock conversation
 
-- [ ] **P3.3: Create refinement agent**
+- [x] **P3.3: Create refinement agent**
   - Create `backend/app/agents/refinement.py`
   - Implement `refinement_agent` (pydantic-ai Agent):
     - Takes current CV dict, resume_text, job_description, latest user message
