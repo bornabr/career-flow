@@ -290,7 +290,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
 
 ### Implementation Tasks
 
-- [ ] **P3.1: Create chat schemas**
+- [x] **P3.1: Create chat schemas**
   - Create `backend/app/schemas/chat.py`
   - Define:
     - `ChatMessage` (id, role, content, kind, timestamp)

@@ -1543,3 +1543,80 @@ For Phase 2 sign-off:
 For CI/CD purposes:
 - Recommend adding Python 3.13 to test environment or upgrading to Python 3.10+
 - Poetry virtualenv must be recreated after system Python updates
+
+## [2026-03-22] Task: P3.1 - Create Chat Schemas
+
+### What Was Created
+
+**File: `backend/app/schemas/chat.py`** (32 lines)
+
+Four Pydantic BaseModel schemas:
+
+1. **ChatMessage**
+   - Fields: id (str), role (str), content (str), kind (str), timestamp (datetime)
+   - Purpose: Represents a single message in chat conversation
+   - Timestamp stored as Python datetime object (ISO 8601 compatible)
+
+2. **IntakeTurnResult**
+   - Fields: assistant_reply (str), ready_to_generate (bool), extracted_constraints (list[str]), missing_fields (list[str])
+   - Purpose: Output from intake agent during pre-generation conversation
+   - All lists use `default_factory=list` for safe defaults
+
+3. **RefinementResult**
+   - Fields: assistant_reply (str), updated_cv_dict (dict[str, Any])
+   - Purpose: Output from refinement agent during post-generation CV editing
+   - Preserves unstructured CV data as generic dict
+
+4. **ArtifactUpdate**
+   - Fields: type (str), cv_data (dict[str, Any])
+   - Purpose: Represents structured artifact update with metadata
+   - Type discriminator for artifact kind (e.g., "cv", "cover_letter")
+
+### Implementation Pattern
+
+All schemas follow existing project conventions from `schemas/cv.py` and `schemas/review.py`:
+- Import from `pydantic import BaseModel, Field`
+- Use Python 3.10+ union syntax: `str | None` for optionals
+- Add Field() descriptors explaining purpose
+- Include docstrings for public classes
+- Use `default_factory=list` for list defaults (safer than `default=[]`)
+- Type hint dicts as `dict[str, Any]` for flexibility
+
+### Field Specifications Rationale
+
+**ChatMessage.timestamp:**
+- Used `datetime` instead of `str` to ensure type safety
+- Pydantic auto-converts ISO 8601 strings to datetime on input
+- Auto-serializes back to ISO 8601 on `.model_dump()`
+- Validates timestamp format at schema boundary
+
+**IntakeTurnResult fields:**
+- `ready_to_generate: bool` (not Optional) — explicitly signals generation readiness decision
+- `extracted_constraints, missing_fields` — both use `default_factory=list` to avoid mutable default gotcha
+
+**RefinementResult.updated_cv_dict:**
+- Uses `dict[str, Any]` (not structured CV schema) to allow partial updates
+- Caller validates/merges into full CV via separate service layer
+- Matches pattern from validation results (dict instead of strict schema)
+
+**ArtifactUpdate.type:**
+- String enum-like pattern (not Python Enum class)
+- Allows extensibility without schema changes
+- Examples: "cv", "cover_letter", "linkedin_profile"
+
+### Verification
+
+✅ File created at correct path: `backend/app/schemas/chat.py`
+✅ All four schemas are Pydantic BaseModel subclasses
+✅ Field names and types match plan exactly
+✅ Docstrings present (necessary for public API contracts)
+✅ Type hints use modern Python 3.10+ syntax
+✅ Imports work via poetry (tested via -c import check)
+
+### Ready for P3.2-P3.3
+
+P3.1 enables:
+- P3.2: Intake agent that returns IntakeTurnResult
+- P3.3: Refinement agent that returns RefinementResult
+- P3.7: Chat API endpoints that consume/return these schemas
+- Frontend chat components that deserialize these types
