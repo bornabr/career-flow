@@ -6,6 +6,7 @@ import type {
   OneLineEntry,
   PersonalProjectEntry,
   ReviewMemo,
+  ChatMessage,
 } from "@/lib/types";
 
 // Re-export types from shared definitions for convenience
@@ -105,6 +106,30 @@ interface AppState {
   generationError: string | null;
   setGenerationError: (error: string | null) => void;
 
+  // ─── Chat state ──────────────────────────────────
+  uiMode: "assistant" | "quick";
+  setUiMode: (mode: "assistant" | "quick") => void;
+
+  chatMessages: ChatMessage[];
+  setChatMessages: (messages: ChatMessage[]) => void;
+  addChatMessage: (message: ChatMessage) => void;
+  clearChatMessages: () => void;
+
+  chatPhase: "intake" | "generation" | "refinement";
+  setChatPhase: (phase: "intake" | "generation" | "refinement") => void;
+
+  chatInput: string;
+  setChatInput: (input: string) => void;
+
+  artifactTab: "cv" | "preview" | "reviews";
+  setArtifactTab: (tab: "cv" | "preview" | "reviews") => void;
+
+  assistantStatus: "idle" | "thinking" | "streaming" | "awaiting_input";
+  setAssistantStatus: (status: "idle" | "thinking" | "streaming" | "awaiting_input") => void;
+
+  intakeReady: boolean;
+  setIntakeReady: (ready: boolean) => void;
+
   // ─── Reset ──────────────────────────────────────
   reset: () => void;
 }
@@ -135,6 +160,13 @@ const initialState = {
   completedSteps: [] as string[],
   liveReviewMemos: [] as ReviewMemo[],
   generationError: null as string | null,
+  uiMode: "quick" as const,
+  chatMessages: [] as ChatMessage[],
+  chatPhase: "intake" as const,
+  chatInput: "",
+  artifactTab: "cv" as const,
+  assistantStatus: "idle" as const,
+  intakeReady: false,
 };
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -196,6 +228,19 @@ export const useAppStore = create<AppState>()((set) => ({
     })),
   clearLiveReviewMemos: () => set({ liveReviewMemos: [] }),
   setGenerationError: (generationError) => set({ generationError }),
+
+  setUiMode: (uiMode) => set({ uiMode }),
+  setChatMessages: (chatMessages) => set({ chatMessages }),
+  addChatMessage: (message) =>
+    set((state) => ({
+      chatMessages: [...state.chatMessages, message],
+    })),
+  clearChatMessages: () => set({ chatMessages: [] }),
+  setChatPhase: (chatPhase) => set({ chatPhase }),
+  setChatInput: (chatInput) => set({ chatInput }),
+  setArtifactTab: (artifactTab) => set({ artifactTab }),
+  setAssistantStatus: (assistantStatus) => set({ assistantStatus }),
+  setIntakeReady: (intakeReady) => set({ intakeReady }),
 
   reset: () => set(initialState),
 }));

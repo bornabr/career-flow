@@ -1928,3 +1928,29 @@ graph LR
 **Verification blocked (environment):**
 - `poetry run pytest backend/tests/graph/test_intake_graph.py backend/tests/graph/test_refinement_graph.py backend/tests/api/test_chat_api.py` failed due broken Poetry runtime (missing Homebrew Python 3.13 dylib).
 - `lsp_diagnostics` on changed files reports only `pytest` unresolved import errors (environment/interpreter issue), no code-level syntax errors.
+
+## 2026-03-22 Task: P3.9 - Extend Zustand Store for Chat State
+
+**What was modified:**
+- File: apps/web/src/lib/types.ts (added ChatMessage interface)
+- File: apps/web/src/lib/store.ts (added 7 fields + 14 setters)
+
+**Fields added:**
+- uiMode: "assistant" | "quick" (default: "quick")
+- chatMessages: ChatMessage[] (with add/clear helpers)
+- chatPhase: "intake" | "generation" | "refinement" (default: "intake")
+- chatInput: string (default: "")
+- artifactTab: "cv" | "preview" | "reviews" (default: "cv")
+- assistantStatus: "idle" | "thinking" | "streaming" | "awaiting_input" (default: "idle")
+- intakeReady: boolean (default: false)
+
+**Pattern followed:**
+- Flat store structure (no slices)
+- Simple setters + array manipulation helpers
+- All fields initialized in initialState
+- Type-safe with TypeScript union types
+- ChatMessage type added to types.ts with role, content, kind, timestamp
+
+**Verification passed:**
+- pnpm type-check → 0 errors
+- Store compiles without warnings

@@ -372,7 +372,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - `artifact.cv.updated` (CV data changed)
   - **Verification:** `lsp_diagnostics` clean, routes registered
 
-- [ ] **P3.8: Write backend chat tests**
+- [x] **P3.8: Write backend chat tests**
   - Create `backend/tests/graph/test_intake_graph.py`
   - Test intake asks questions until ready
   - Create `backend/tests/graph/test_refinement_graph.py`
@@ -381,7 +381,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Test all 3 streaming endpoints
   - **Verification:** `poetry run pytest backend/tests/graph/test_intake_graph.py backend/tests/graph/test_refinement_graph.py backend/tests/api/test_chat_api.py`
 
-- [ ] **P3.9: Extend Zustand store for chat state**
+- [x] **P3.9: Extend Zustand store for chat state**
   - Update `apps/web/src/lib/store.ts`
   - Add fields (flat, no slices):
     - `uiMode: "assistant" | "quick"`

@@ -74,6 +74,14 @@ export interface ReviewMemo {
   suggestions: string[];
 }
 
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  kind: "text" | "artifact";
+  timestamp: Date;
+}
+
 // ─── Helpers ─────────────────────────────────────
 
 export function createEmptyCV(): CV {
