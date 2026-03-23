@@ -2531,3 +2531,28 @@ The Reviews tab now:
 - Set pendingReviewApproval in store when interrupt received
 - Switch artifactTab to "reviews" automatically
 - Call streamReviewResume() when user submits decisions
+
+## P4.12a: streamReviewResume API Function (2026-03-23)
+
+### Completed
+✓ Added `streamReviewResume` function to `apps/web/src/lib/api.ts`
+✓ Function signature: `streamReviewResume(threadId, reviewDecisions, handlers, apiKey?, modelName?)`
+✓ Converts `Record<string, boolean>` to array of `{item_key, accepted}` objects
+✓ Calls `POST /api/chat/review/resume/stream` endpoint
+✓ Uses `parseSSE(res, handlers)` for streaming event handling
+✓ TypeScript compiles clean (`pnpm build` passed)
+
+### Implementation Details
+- Function signature matches pattern of `streamRefinementChat` and `streamAssistantGenerate`
+- Conversion logic: `Object.entries(reviewDecisions).map(([item_key, accepted]) => ({item_key, accepted}))`
+- Request body follows backend `ReviewResumeRequest` schema: `{thread_id, decisions, api_key?, model_name?}`
+- Error handling: checks `res.ok`, parses JSON error detail, throws with descriptive message
+- Return type: `Promise<void>` (streaming, no return value)
+- Uses `API_BASE` constant for base URL configuration
+
+### Verification
+✓ TypeScript compilation: `pnpm build` completed successfully
+✓ Function location: line 307-339 in `apps/web/src/lib/api.ts`
+✓ No modifications to existing functions
+✓ No new dependencies added
+✓ Ready for integration in P4.12b (chat-workspace.tsx)

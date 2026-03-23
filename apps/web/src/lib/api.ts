@@ -303,3 +303,37 @@ export async function streamRefinementChat(
 
   await parseSSE(res, handlers);
 }
+
+export async function streamReviewResume(
+  threadId: string,
+  reviewDecisions: Record<string, boolean>,
+  handlers: EventHandlers,
+  apiKey?: string | null,
+  modelName?: string | null
+): Promise<void> {
+  // Convert reviewDecisions from Record<string, boolean> to array format
+  const decisionsArray = Object.entries(reviewDecisions).map(
+    ([item_key, accepted]) => ({
+      item_key,
+      accepted,
+    })
+  );
+
+  const res = await fetch(`${API_BASE}/api/chat/review/resume/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      thread_id: threadId,
+      decisions: decisionsArray,
+      api_key: apiKey,
+      model_name: modelName,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to stream review resume");
+  }
+
+  await parseSSE(res, handlers);
+}
