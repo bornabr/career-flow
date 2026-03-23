@@ -2494,3 +2494,40 @@ IMPORTANT: Default state is ACCEPT ALL recommendations.
 ✓ Store integration matches P4.8 schema
 ✓ Severity badge colors match specification
 ✓ Default acceptance logic implemented correctly
+
+
+## P4.11: Integrate Review Panel into Artifact Panel (2026-03-23)
+
+### Completed
+✓ Updated artifact-panel.tsx to import and render ReviewCommitteePanel
+✓ Replaced placeholder "Review panel (Phase 4)" with actual component
+✓ TypeScript compilation clean (pnpm build passed)
+
+### Changes Made
+- Added import: `import { ReviewCommitteePanel } from "@/components/review-committee-panel"`
+- Replaced TabsContent for "reviews" tab:
+  - Removed placeholder div with static text
+  - Added `<ReviewCommitteePanel />` component
+  - Removed p-4 padding from TabsContent (ReviewCommitteePanel has own padding)
+
+### Integration Pattern
+The Reviews tab now:
+1. Renders ReviewCommitteePanel directly (no conditional)
+2. ReviewCommitteePanel handles its own null state (shows "No Review Pending" card)
+3. When pendingReviewApproval is set (by P4.12), panel shows reviewer memos
+4. Users toggle switches and submit decisions
+5. Integrates seamlessly with existing CV and Preview tabs
+
+### File Modified
+- `apps/web/src/components/artifact-panel.tsx` — 33→34 lines (added import, replaced placeholder)
+
+### Verification
+✓ pnpm build passes (TypeScript clean)
+✓ No breaking changes to existing CV/Preview tabs
+✓ Reviews tab ready for P4.12 interrupt handling
+
+### Next Steps (P4.12)
+- chat-workspace.tsx will handle interrupt.pending events
+- Set pendingReviewApproval in store when interrupt received
+- Switch artifactTab to "reviews" automatically
+- Call streamReviewResume() when user submits decisions

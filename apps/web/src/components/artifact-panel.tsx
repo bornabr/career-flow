@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppStore } from "@/lib/store";
 import { CVEditor } from "@/components/cv-editor";
 import { PreviewPanel } from "@/components/preview-panel";
+import { ReviewCommitteePanel } from "@/components/review-committee-panel";
 
 export function ArtifactPanel() {
   const { artifactTab, setArtifactTab } = useAppStore();
@@ -22,10 +23,8 @@ export function ArtifactPanel() {
         <TabsContent value="preview" className="flex-1 overflow-y-auto">
           <PreviewPanel />
         </TabsContent>
-        <TabsContent value="reviews" className="flex-1 overflow-y-auto p-4">
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <p>Review panel (Phase 4)</p>
-          </div>
+        <TabsContent value="reviews" className="flex-1 overflow-y-auto">
+          <ReviewCommitteePanel />
         </TabsContent>
       </Tabs>
     </div>

@@ -577,7 +577,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Visual severity indicators
   - **Verification:** Unit test
 
-- [ ] **P4.11: Integrate review panel into artifact panel**
+- [x] **P4.11: Integrate review panel into artifact panel**
   - Update `apps/web/src/components/artifact-panel.tsx`
   - Add "Reviews" tab (previously placeholder)
   - Show `<ReviewCommitteePanel />` when `pendingReviewApproval` is set
