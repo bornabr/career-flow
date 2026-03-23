@@ -142,6 +142,12 @@ interface AppState {
   isAwaitingReviewApproval: boolean;
   setIsAwaitingReviewApproval: (awaiting: boolean) => void;
 
+  currentThreadId: string | null;
+  setCurrentThreadId: (id: string | null) => void;
+
+  reviewSubmitHandler: (() => Promise<void>) | null;
+  setReviewSubmitHandler: (handler: (() => Promise<void>) | null) => void;
+
   // ─── Reset ──────────────────────────────────────
   reset: () => void;
 }
@@ -182,6 +188,8 @@ const initialState = {
   pendingReviewApproval: null as ReviewApprovalPayload | null,
   reviewDecisions: {} as Record<string, boolean>,
   isAwaitingReviewApproval: false,
+  currentThreadId: null as string | null,
+  reviewSubmitHandler: null as (() => Promise<void>) | null,
 };
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -266,6 +274,8 @@ export const useAppStore = create<AppState>()((set) => ({
   clearReviewDecisions: () => set({ reviewDecisions: {} }),
   setIsAwaitingReviewApproval: (isAwaitingReviewApproval) =>
     set({ isAwaitingReviewApproval }),
+  setCurrentThreadId: (currentThreadId) => set({ currentThreadId }),
+  setReviewSubmitHandler: (reviewSubmitHandler) => set({ reviewSubmitHandler }),
 
   reset: () => set(initialState),
 }));

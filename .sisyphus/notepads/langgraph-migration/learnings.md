@@ -2556,3 +2556,114 @@ The Reviews tab now:
 ✓ No modifications to existing functions
 ✓ No new dependencies added
 ✓ Ready for integration in P4.12b (chat-workspace.tsx)
+
+## P4.12b: Chat Workspace Interrupt Handling (2026-03-23)
+
+### Completed
+✓ Added `onInterruptPending` handler to `streamAssistantGenerate` in chat-workspace.tsx
+✓ Added `onThreadStarted` handler to capture thread_id from generation stream
+✓ Added `currentThreadId` state field to store for tracking active graph thread
+✓ Updated `onComplete` handler to conditionally advance phase (check isAwaitingReviewApproval)
+✓ Implemented `handleReviewSubmit` callback that calls `streamReviewResume()`
+✓ Added `reviewSubmitHandler` to store for cross-component communication
+✓ Updated ReviewCommitteePanel to call handler on submit (replaced TODO)
+✓ Added `isSubmitting` state to ReviewCommitteePanel for UI feedback
+✓ Extended EventHandlers interface to include missing event handlers
+✓ TypeScript compiles clean - zero errors
+
+### Implementation Details
+
+**Store Changes (lib/store.ts)**:
+- Added `currentThreadId: string | null` to track active LangGraph thread
+- Added `reviewSubmitHandler: (() => Promise<void>) | null` as callback registry
+- Both fields initialized to null and have setters
+
+**Chat Workspace Changes (chat-workspace.tsx)**:
+- Import `streamReviewResume` from api
+- Import `ReviewApprovalPayload` type from types
+- Destructured 8 new store fields (pending, decisions, handlers, thread)
+- Added `onThreadStarted` handler to capture thread_id from first event
+- Added `onInterruptPending` handler that:
+  - Stores pending review approval payload
+  - Sets awaiting approval flag
+  - Switches artifact tab to "reviews"
+  - Updates assistant status to "awaiting_input"
+  - Adds chat message about review committee
+- Modified `onComplete` handler to check `isAwaitingReviewApproval` before advancing phase
+- Implemented `handleReviewSubmit` useCallback that:
+  - Validates thread_id and reviewDecisions exist
+  - Calls `streamReviewResume()` with handlers for artifact, complete, and error events
+  - On success: transitions to refinement, clears decisions, adds completion message
+  - On error: shows toast and keeps status idle
+- Added effect to register handler in store for component communication
+
+**Review Committee Panel Changes (review-committee-panel.tsx)**:
+- Import `useState` hook
+- Get `reviewSubmitHandler` from store instead of local function
+- Added `isSubmitting` state to disable button during async operation
+- Removed TODO placeholder
+- Updated `handleSubmit` to call store handler with try/finally for cleanup
+- Button shows "Submitting..." during request and disables during submission
+
+**EventHandlers Interface (lib/sse.ts)**:
+- Added missing handlers: `onInterruptPending`, `onThreadStarted`, `onArtifactUpdate`, `onMessage`, `onIntakeReady`
+- These were already being called in other parts of code but not defined in interface
+
+### Verification
+✓ Build passes with zero TypeScript errors
+✓ All imports resolve correctly
+✓ Store setters properly typed
+✓ Dependency arrays complete in useCallback and useEffect
+✓ No unused variables or missing types
+
+### Flow Architecture
+```
+User submits intake → streamAssistantGenerate starts
+  ↓
+Backend runs graph, emits thread_started event
+  → chat-workspace captures thread_id
+  ↓
+Graph reaches review_gate_node (if review_mode=true)
+  ↓
+Backend emits interrupt.pending event with reviews
+  → chat-workspace handler:
+    - Stores pending approval
+    - Sets awaiting flag
+    - Shows reviews tab
+  ↓
+User reviews items, toggles accept/reject switches
+  ↓
+User clicks Submit button
+  → ReviewCommitteePanel calls reviewSubmitHandler
+  → handleReviewSubmit calls streamReviewResume(thread_id, decisions)
+  ↓
+Backend resumes graph with filtered reviews
+  → Synthesis node runs
+  ↓
+Backend emits onArtifactUpdate with final CV
+  → chat-workspace updates cvData
+  ↓
+Backend emits onComplete
+  → chat-workspace transitions to refinement phase
+```
+
+### Design Decisions
+
+**Why store-based callback instead of prop drilling?**
+- ReviewCommitteePanel is rendered inside artifact-panel (inside page.tsx)
+- chat-workspace exists in separate component tree
+- Would need 3-4 levels of prop drilling
+- Store-based handler registry is cleaner and more idiomatic for Zustand
+
+**Why capture thread_id in chat-workspace?**
+- Backend emits thread_id in first event (onThreadStarted)
+- Needed by reviewSubmitHandler to call resume endpoint
+- Can't pass through ReviewCommitteePanel - it doesn't know about generation details
+- Store field makes it accessible to both components
+
+**Why isAwaitingReviewApproval check in onComplete?**
+- Normal flow: generation completes → auto-advance to refinement
+- HITL flow: generation pauses at interrupt → stay in generation phase
+- Only advance to refinement if no interrupt occurred
+- onComplete still fires after resume completes, so check prevents double-transition
+

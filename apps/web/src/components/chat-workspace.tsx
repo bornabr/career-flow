@@ -7,9 +7,10 @@ import {
   streamAssistantGenerate,
   streamIntakeChat,
   streamRefinementChat,
+  streamReviewResume,
 } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
-import type { CV, ChatMessage } from "@/lib/types";
+import type { CV, ChatMessage, ReviewApprovalPayload } from "@/lib/types";
 
 type IntakeMessagePayload = { assistant_reply?: string };
 type IntakeReadyPayload = {
@@ -51,6 +52,16 @@ export function ChatWorkspace() {
     setIntakeReady,
     setCvData,
     setChatInput,
+    pendingReviewApproval,
+    setPendingReviewApproval,
+    isAwaitingReviewApproval,
+    setIsAwaitingReviewApproval,
+    reviewDecisions,
+    clearReviewDecisions,
+    setArtifactTab,
+    currentThreadId,
+    setCurrentThreadId,
+    setReviewSubmitHandler,
   } = useAppStore();
 
   const handleSendMessage = useCallback(async () => {
@@ -199,6 +210,12 @@ export function ChatWorkspace() {
           jobDescription,
           extractedConstraints,
           {
+            onThreadStarted: (data: unknown) => {
+              const payload = data as { thread_id?: string };
+              if (payload.thread_id) {
+                setCurrentThreadId(payload.thread_id);
+              }
+            },
             onArtifactUpdate: (data: unknown) => {
               const payload = data as ArtifactPayload;
               if (!payload.cv_data) {
@@ -206,6 +223,24 @@ export function ChatWorkspace() {
               }
 
               setCvData(payload.cv_data as CV);
+            },
+            onInterruptPending: (data: unknown) => {
+              if (cancelled) {
+                return;
+              }
+
+              const payload = data as ReviewApprovalPayload;
+              setPendingReviewApproval(payload);
+              setIsAwaitingReviewApproval(true);
+              setArtifactTab("reviews");
+              setAssistantStatus("awaiting_input");
+
+              addChatMessage(
+                createTextMessage(
+                  "assistant",
+                  "The review committee has finished evaluating your CV. Please review their recommendations in the Reviews tab and approve or reject each item."
+                )
+              );
             },
             onError: (data: unknown) => {
               const payload = data as ErrorPayload;
@@ -220,14 +255,17 @@ export function ChatWorkspace() {
                 return;
               }
 
-              setChatPhase("refinement");
-              setAssistantStatus("idle");
-              addChatMessage(
-                createTextMessage(
-                  "assistant",
-                  "Your tailored CV is ready! You can now ask me to refine any section."
-                )
-              );
+              // Only auto-advance if we didn't hit an interrupt
+              if (!isAwaitingReviewApproval) {
+                setChatPhase("refinement");
+                setAssistantStatus("idle");
+                addChatMessage(
+                  createTextMessage(
+                    "assistant",
+                    "Your tailored CV is ready! You can now ask me to refine any section."
+                  )
+                );
+              }
             },
           } as Parameters<typeof streamAssistantGenerate>[3],
           userInstructions.trim() || null,
@@ -256,17 +294,88 @@ export function ChatWorkspace() {
     apiKey,
     chatPhase,
     intakeReady,
+    isAwaitingReviewApproval,
     jobDescription,
     resumeText,
     reviewMode,
     reviewModel,
     selectedModel,
+    setArtifactTab,
     setAssistantStatus,
+    setCurrentThreadId,
     setChatPhase,
     setCvData,
     setIntakeReady,
+    setIsAwaitingReviewApproval,
+    setPendingReviewApproval,
     userInstructions,
   ]);
+
+  const handleReviewSubmit = useCallback(async () => {
+    if (!currentThreadId || !reviewDecisions || Object.keys(reviewDecisions).length === 0) {
+      return;
+    }
+
+    setIsAwaitingReviewApproval(true);
+    setAssistantStatus("streaming");
+
+    try {
+      await streamReviewResume(
+        currentThreadId,
+        reviewDecisions,
+        {
+          onArtifactUpdate: (data: unknown) => {
+            const payload = data as ArtifactPayload;
+            if (payload.cv_data) {
+              setCvData(payload.cv_data as CV);
+            }
+          },
+          onComplete: () => {
+            setChatPhase("refinement");
+            setAssistantStatus("idle");
+            clearReviewDecisions();
+            setPendingReviewApproval(null);
+            setIsAwaitingReviewApproval(false);
+            addChatMessage(
+              createTextMessage(
+                "assistant",
+                "Your CV has been finalized based on the approved recommendations!"
+              )
+            );
+          },
+          onError: (data: unknown) => {
+            const payload = data as ErrorPayload;
+            toast.error(payload.error || "Failed to resume generation");
+            setAssistantStatus("idle");
+            setIsAwaitingReviewApproval(false);
+          },
+        } as Parameters<typeof streamReviewResume>[2],
+        apiKey.trim() || null,
+        selectedModel.trim() || null
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to resume generation";
+      toast.error(message);
+      setAssistantStatus("idle");
+      setIsAwaitingReviewApproval(false);
+    }
+  }, [
+    currentThreadId,
+    reviewDecisions,
+    setIsAwaitingReviewApproval,
+    setAssistantStatus,
+    setCvData,
+    setChatPhase,
+    clearReviewDecisions,
+    setPendingReviewApproval,
+    addChatMessage,
+    apiKey,
+    selectedModel,
+  ]);
+
+  useEffect(() => {
+    setReviewSubmitHandler(handleReviewSubmit);
+  }, [handleReviewSubmit, setReviewSubmitHandler]);
 
   return (
     <div className="flex h-full flex-col" data-ui-mode={uiMode}>

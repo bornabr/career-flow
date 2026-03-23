@@ -4,6 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { ReviewerMemoCard } from "./reviewer-memo-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react";
 
 export function ReviewCommitteePanel() {
   const pendingReviewApproval = useAppStore(
@@ -13,9 +14,11 @@ export function ReviewCommitteePanel() {
   const isAwaitingReviewApproval = useAppStore(
     (state) => state.isAwaitingReviewApproval
   );
-  const setIsAwaitingReviewApproval = useAppStore(
-    (state) => state.setIsAwaitingReviewApproval
+  const reviewSubmitHandler = useAppStore(
+    (state) => state.reviewSubmitHandler
   );
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!pendingReviewApproval) {
     return (
@@ -34,10 +37,16 @@ export function ReviewCommitteePanel() {
   const hasDecisions = Object.keys(reviewDecisions).length > 0;
 
   const handleSubmit = async () => {
-    // TODO (P4.12): Call streamReviewResume(thread_id, reviewDecisions)
-    // For now, this is a placeholder
-    console.log("Review decisions:", reviewDecisions);
-    setIsAwaitingReviewApproval(false);
+    if (!reviewSubmitHandler) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await reviewSubmitHandler();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -61,9 +70,9 @@ export function ReviewCommitteePanel() {
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button
           onClick={handleSubmit}
-          disabled={isAwaitingReviewApproval || !hasDecisions}
+          disabled={isAwaitingReviewApproval || !hasDecisions || isSubmitting}
         >
-          Submit Review Decisions
+          {isSubmitting ? "Submitting..." : "Submit Review Decisions"}
         </Button>
       </div>
     </div>

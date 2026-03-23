@@ -22,6 +22,12 @@ export interface EventHandlers {
   onResult?: (data: unknown) => void;
   onError?: (data: unknown) => void;
   onRunCompleted?: (data: unknown) => void;
+  onInterruptPending?: (data: unknown) => void;
+  onThreadStarted?: (data: unknown) => void;
+  onArtifactUpdate?: (data: unknown) => void;
+  onMessage?: (data: unknown) => void;
+  onIntakeReady?: (data: unknown) => void;
+  onComplete?: (data: unknown) => void;
 }
 
 /**
