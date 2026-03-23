@@ -1,4 +1,5 @@
 import { parseSSE, EventHandlers } from "./sse";
+import type { ChatMessage } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -191,4 +192,114 @@ export async function generateCoverLetter(
   }
 
   return res.json();
+}
+
+// ─── Chat ────────────────────────────────────────────────
+
+export async function streamIntakeChat(
+  messages: ChatMessage[],
+  resumeText: string,
+  jobDescription: string,
+  userInstructions: string | null,
+  handlers: EventHandlers,
+  apiKey?: string | null,
+  modelName?: string | null
+): Promise<void> {
+  // Convert messages to plain objects (remove Date, make serializable)
+  const serializedMessages = messages.map((msg) => ({
+    ...msg,
+    timestamp: msg.timestamp.toISOString(),
+  }));
+
+  const res = await fetch(`${API_BASE}/api/chat/intake/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: serializedMessages,
+      resume_text: resumeText,
+      job_description: jobDescription,
+      user_instructions: userInstructions,
+      api_key: apiKey,
+      model_name: modelName,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to stream intake chat");
+  }
+
+  await parseSSE(res, handlers);
+}
+
+export async function streamAssistantGenerate(
+  resumeText: string,
+  jobDescription: string,
+  extractedConstraints: string[],
+  handlers: EventHandlers,
+  userInstructions?: string | null,
+  apiKey?: string | null,
+  modelName?: string | null,
+  reviewMode?: boolean,
+  reviewModel?: string | null
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/chat/generate/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resume_text: resumeText,
+      job_description: jobDescription,
+      user_instructions: userInstructions,
+      extracted_constraints: extractedConstraints,
+      api_key: apiKey,
+      model_name: modelName,
+      review_mode: reviewMode ?? false,
+      review_model: reviewModel,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to stream assistant generation");
+  }
+
+  await parseSSE(res, handlers);
+}
+
+export async function streamRefinementChat(
+  messages: ChatMessage[],
+  currentCvDict: Record<string, unknown>,
+  resumeText: string,
+  jobDescription: string,
+  latestUserMessage: string,
+  handlers: EventHandlers,
+  apiKey?: string | null,
+  modelName?: string | null
+): Promise<void> {
+  // Convert messages to plain objects (remove Date, make serializable)
+  const serializedMessages = messages.map((msg) => ({
+    ...msg,
+    timestamp: msg.timestamp.toISOString(),
+  }));
+
+  const res = await fetch(`${API_BASE}/api/chat/refine/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: serializedMessages,
+      current_cv_dict: currentCvDict,
+      resume_text: resumeText,
+      job_description: jobDescription,
+      latest_user_message: latestUserMessage,
+      api_key: apiKey,
+      model_name: modelName,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to stream refinement chat");
+  }
+
+  await parseSSE(res, handlers);
 }

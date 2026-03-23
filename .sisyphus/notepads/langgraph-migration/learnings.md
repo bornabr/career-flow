@@ -1954,3 +1954,44 @@ graph LR
 **Verification passed:**
 - pnpm type-check → 0 errors
 - Store compiles without warnings
+
+## [2026-03-22 10:15] Task: P3.10 - Extend API Client for Chat Endpoints
+
+**What was added:**
+- File: apps/web/src/lib/api.ts (3 new functions, 109 lines added)
+
+**Functions added:**
+1. `streamIntakeChat()` — POST /api/chat/intake/stream
+   - Takes messages array, resume_text, job_description, user_instructions
+   - Serializes ChatMessage.timestamp (Date → ISO string)
+   - Results come via EventHandlers.onResult callback
+
+2. `streamAssistantGenerate()` — POST /api/chat/generate/stream
+   - Takes resume_text, job_description, extracted_constraints array
+   - Optional parameters: user_instructions, review_mode, review_model
+   - Defaults review_mode to false via nullish coalescing (`?? false`)
+
+3. `streamRefinementChat()` — POST /api/chat/refine/stream
+   - Takes messages array, current_cv_dict, resume_text, job_description, latest_user_message
+   - Also serializes ChatMessage timestamps
+
+**Pattern followed:**
+- Same structure as existing `streamGenerateCV()` (POST → check res.ok → parseSSE)
+- All return `Promise<void>` (results via handlers, not return value)
+- Snake_case request body keys matching backend Pydantic models
+- camelCase parameter names following frontend convention
+
+**Key implementation detail:**
+- ChatMessage timestamps are Date objects in frontend but must be ISO strings for JSON
+- Serialization happens inline: `.map((msg) => ({ ...msg, timestamp: msg.timestamp.toISOString() }))`
+- Two functions use this pattern: streamIntakeChat and streamRefinementChat
+
+**Import addition:**
+- Added `import type { ChatMessage } from "./types";` at top of api.ts
+
+**Verification:**
+- pnpm type-check → 0 errors
+- npx tsc --noEmit → 0 errors
+- No changes to existing functions
+- Error messages follow existing pattern (specific endpoint description)
+
