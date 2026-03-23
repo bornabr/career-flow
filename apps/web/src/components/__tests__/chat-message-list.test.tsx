@@ -31,7 +31,7 @@ describe("ChatMessageList", () => {
       },
     ];
 
-    const { container } = render(<ChatMessageList messages={messages} />);
+    render(<ChatMessageList messages={messages} />);
     
     expect(screen.getByText("Hello assistant")).toBeInTheDocument();
     expect(screen.getByText("Hello user")).toBeInTheDocument();
