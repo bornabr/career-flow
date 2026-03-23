@@ -2034,3 +2034,39 @@ graph LR
 - **Tailwind 4 CSS Variables**: Tailwind 4 exposes CSS variables directly (e.g., `var(--border)`, `var(--background)`). When using `oklch` colors defined in `:root`, use `var(--color-name)` or `var(--name)` directly instead of wrapping them in `hsl()`.
 - **Responsive Layouts with `overflow-hidden`**: When a parent container (like `main`) has `overflow-hidden`, child flex containers must explicitly handle their own scrolling (e.g., `overflow-y: auto`) and have a defined height (like `height: 100%` or `min-height`) to prevent content from being cut off, especially when stacking elements on mobile.
 - **Sticky Elements in Flex Containers**: To make an element sticky at the bottom of a scrollable flex container, ensure the container has `overflow-y: auto` and the sticky element has `position: sticky; bottom: 0; z-index: 10;`.
+
+## P4.1: HITL Review Schemas Added (2026-03-23)
+
+### What was done
+- Added 4 new Pydantic schemas to `backend/app/schemas/review.py`
+- Total file grew from 55 lines to 88 lines
+- All schemas follow existing project patterns (Python 3.10+ type hints, Field descriptors with descriptions)
+
+### Schemas added
+1. **InteractiveReviewItem** - Individual actionable recommendation with unique key (`{reviewer_role}:{index}`)
+2. **InteractiveReviewMemo** - Normalized review memo with interactive items + overall score
+3. **ReviewDecision** - User's binary accept/reject choice for one item
+4. **ReviewApprovalPayload** - Complete payload sent to frontend during interrupt (includes all reviews, hallucination report, consensus score)
+
+### Key implementation details
+- Used `dict[str, object] | None` for hallucination_report in ReviewApprovalPayload (not `dict[str, Any]` because Any not imported)
+- All schemas inserted before model rebuild section (lines 52-79)
+- Updated model rebuild section to include all 4 new schemas
+- Syntax verified: `python3 -m py_compile` passes cleanly
+
+### Purpose in HITL workflow
+- **InteractiveReviewItem**: Simplifies ReviewItem (removes category/section/finding fields) for UI display with unique key for tracking user decisions
+- **InteractiveReviewMemo**: Flattens ReviewMemo structure for HITL - just items + overall score instead of full memo
+- **ReviewDecision**: Captures user's choice (accept/reject) for each item
+- **ReviewApprovalPayload**: Complete data structure emitted during interrupt in review_gate node (P4.3)
+
+### Dependencies resolved
+- Used in: P4.2 (normalization helper), P4.3 (review_gate node), P4.5 (Resume endpoint), P4.9 (frontend ReviewCommitteePanel)
+- No import changes needed - BaseModel and Field already present
+- No existing schemas modified - only additive changes
+
+### Verification
+✓ Syntax check passed
+✓ All field names match specification exactly
+✓ Type hints follow Python 3.10+ union syntax (X | None)
+✓ Model rebuilds updated
