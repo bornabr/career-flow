@@ -76,7 +76,8 @@ async def hr_review_node(state: GenerationState, config: RunnableConfig) -> dict
             model_name=review_model,
             api_key=review_key,
         )
-        emit_review_memo(writer, "hr", review.model_dump())
+        item_keys = [f"hr:{i}" for i in range(len(review.priority_changes))]
+        emit_review_memo(writer, "hr", review.model_dump(), item_keys)
         emit_step_completed(writer, "hr_review")
         return {"reviews": [review]}
     except Exception as exc:
@@ -106,7 +107,8 @@ async def technical_review_node(state: GenerationState, config: RunnableConfig) 
             model_name=review_model,
             api_key=review_key,
         )
-        emit_review_memo(writer, "technical", review.model_dump())
+        item_keys = [f"technical:{i}" for i in range(len(review.priority_changes))]
+        emit_review_memo(writer, "technical", review.model_dump(), item_keys)
         emit_step_completed(writer, "technical_review")
         return {"reviews": [review]}
     except Exception as exc:
@@ -136,7 +138,8 @@ async def ats_review_node(state: GenerationState, config: RunnableConfig) -> dic
             model_name=review_model,
             api_key=review_key,
         )
-        emit_review_memo(writer, "ats", review.model_dump())
+        item_keys = [f"ats:{i}" for i in range(len(review.priority_changes))]
+        emit_review_memo(writer, "ats", review.model_dump(), item_keys)
         emit_step_completed(writer, "ats_review")
         return {"reviews": [review]}
     except Exception as exc:

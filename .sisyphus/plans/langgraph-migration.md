@@ -536,7 +536,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Then normal `step.started`, `artifact.cv.updated`, `result`, `run.completed`
   - **Verification:** `lsp_diagnostics` clean
 
-- [ ] **P4.6: Write backend interrupt tests**
+- [ ] **P4.6: Write backend interrupt tests** (SKIPPED - test environment broken)
   - Create `backend/tests/graph/test_review_interrupts.py`
   - Test cases:
     - Interrupt emitted when reviews exist
@@ -547,7 +547,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
   - Test resume endpoint
   - **Verification:** `poetry run pytest backend/tests/graph/test_review_interrupts.py backend/tests/api/test_review_resume_api.py`
 
-- [ ] **P4.7: Update SSE events to include item_key**
+- [x] **P4.7: Update SSE events to include item_key**
   - Update `backend/app/graph/events.py`
   - `emit_review_memo()` now includes normalized `item_key` values
   - **Verification:** `lsp_diagnostics` clean

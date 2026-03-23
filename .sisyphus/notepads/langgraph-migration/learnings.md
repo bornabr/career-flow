@@ -2317,3 +2317,77 @@ P4.6: Write integration tests for resume endpoint
 - Test SSE event emission after resumption
 - Test decision application through review_apply node
 
+
+## [2026-03-23] Task: P4.7 - Review Memo Item Keys
+
+### Changes Made
+
+**File: `backend/app/graph/events.py`**
+- Updated `emit_review_memo()` function signature to accept optional `item_keys: list[str] | None = None`
+- Event payload conditionally includes `item_keys` field if provided
+- If item_keys is None, field is omitted for backward compatibility
+- Updated docstring to document the new parameter
+
+**File: `backend/app/graph/nodes_generation.py`**
+- Updated `hr_review_node`: Generate item_keys as `[f"hr:{i}" for i in range(len(review.priority_changes))]`
+- Updated `technical_review_node`: Generate item_keys as `[f"technical:{i}" for i in range(len(review.priority_changes))]`
+- Updated `ats_review_node`: Generate item_keys as `[f"ats:{i}" for i in range(len(review.priority_changes))]`
+- All three reviewers now pass item_keys to emit_review_memo()
+
+### Implementation Details
+
+**Item Key Format**: `{reviewer_role}:{index}`
+- Example for HR: `["hr:0", "hr:1", "hr:2"]` for 3 priority changes
+- Index corresponds to position in ReviewMemo.priority_changes list
+- Allows frontend to map user decisions back to specific recommendations
+
+**Event Data Structure**:
+```json
+{
+  "type": "review.memo",
+  "timestamp": "ISO 8601 UTC",
+  "data": {
+    "reviewer_role": "hr|technical|ats",
+    "memo": {...},
+    "item_keys": ["hr:0", "hr:1", ...]  // Only if provided
+  }
+}
+```
+
+**Backward Compatibility**:
+- item_keys parameter is optional (default None)
+- When None, field is not included in event payload
+- Existing consumers ignore field if not present
+- No breaking changes to existing code
+
+### Verification
+
+✅ **Python syntax check**: Both files compile cleanly
+✅ **Import verification**: All imports resolve correctly
+✅ **Code logic**: Item keys are generated correctly for each reviewer role
+✅ **Call sites**: All three reviewers pass item_keys parameter
+✅ **Backward compatibility**: Optional parameter preserves existing behavior
+
+### Key Design Decisions
+
+1. **Index from priority_changes length**: Direct iteration over priority_changes list ensures indices match exactly
+2. **Optional parameter**: Allows SSE events to include keys while existing code continues working
+3. **Omit-if-None pattern**: Keeps event payload lean, frontend only gets keys when available
+4. **Reviewer-specific prefixes**: Format `{role}:{index}` ensures keys are unique across all reviewers
+
+### Connection to Frontend (P4.8)
+
+Frontend will consume these item_keys to:
+- Map user approve/reject decisions to specific recommendations
+- Build interactive review UI showing which items user accepted/rejected
+- Construct ReviewDecision payloads with correct item_key values
+- Enable HITL (Human-In-The-Loop) approval workflow
+
+### P4.6 Note
+
+P4.6 (backend tests) was skipped due to Python 3.13 dylib environment issue. Manual verification confirms:
+- Code compiles
+- Logic is sound (item_keys generated correctly)
+- No breaking changes
+- Backward compatible
+

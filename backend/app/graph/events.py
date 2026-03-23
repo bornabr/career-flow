@@ -90,7 +90,12 @@ def emit_step_completed(writer: Callable[[dict[str, Any]], None], step_name: str
     })
 
 
-def emit_review_memo(writer: Callable[[dict[str, Any]], None], reviewer_role: str, memo: dict[str, Any]) -> None:
+def emit_review_memo(
+    writer: Callable[[dict[str, Any]], None],
+    reviewer_role: str,
+    memo: dict[str, Any],
+    item_keys: list[str] | None = None
+) -> None:
     """Emit a review memo from a reviewer agent.
 
     Event type: "review.memo"
@@ -99,14 +104,20 @@ def emit_review_memo(writer: Callable[[dict[str, Any]], None], reviewer_role: st
         writer: Stream writer callable from langgraph.config.get_stream_writer()
         reviewer_role: Role of the reviewer (e.g., "hr", "technical", "ats")
         memo: ReviewMemo object as dict (use ReviewMemo.model_dump())
+        item_keys: Optional list of normalized item keys (e.g., ["hr:0", "hr:1"]) for frontend tracking.
+                   If None, omitted from payload for backward compatibility.
     """
+    data = {
+        "reviewer_role": reviewer_role,
+        "memo": memo,
+    }
+    if item_keys is not None:
+        data["item_keys"] = item_keys
+    
     writer({
         "type": "review.memo",
         "timestamp": _now_iso(),
-        "data": {
-            "reviewer_role": reviewer_role,
-            "memo": memo,
-        }
+        "data": data,
     })
 
 
