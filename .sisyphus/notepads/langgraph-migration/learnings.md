@@ -2070,3 +2070,46 @@ graph LR
 ✓ All field names match specification exactly
 ✓ Type hints follow Python 3.10+ union syntax (X | None)
 ✓ Model rebuilds updated
+
+## [2026-03-23 09:37] Task: P4.2 - Review Normalization Function
+
+**Status:** ✅ COMPLETED
+
+**File Created:** `backend/app/graph/review_normalization.py`
+
+**Function Implemented:** `normalize_review_memo(memo: ReviewMemo, reviewer_role: str) -> InteractiveReviewMemo`
+
+**Key Implementation Details:**
+
+1. **Substring Matching Logic** — Priority changes are matched to ReviewItems using case-insensitive substring matching:
+   - `priority_change.lower() in review_item.recommendation.lower()`
+   - Allows flexible matching even if wording differs slightly
+   - Breaks on first match for efficiency
+
+2. **Fallback Behavior** — If no matching ReviewItem found:
+   - Rationale: `f"Recommended by {reviewer_role} reviewer"`
+   - Severity: `"suggestion"` (safest default)
+   - Prevents KeyError and provides sensible defaults
+
+3. **Overall Rationale Construction** — Concise summary from agent's strengths/weaknesses:
+   - Takes first 2 strengths and first 2 weaknesses
+   - Format: `"Strengths: X, Y. Weaknesses: A, B."`
+   - Keeps frontend readable without overwhelming users
+
+4. **Type Hints** — Used Python 3.10+ syntax:
+   - `list[InteractiveReviewItem]` instead of `List[...]`
+   - `dict[...]` style (ready for future use)
+   - Cleaner, more Pythonic
+
+**Verification:**
+- ✅ Syntax check: `python3 -m py_compile` passed
+- ✅ AST validation: Full abstract syntax tree verified
+- ✅ Import path: Uses correct `from app.schemas.review` (not backend.app...)
+- ✅ All required fields populated in return value
+
+**Dependencies Satisfied:**
+- P4.1 (schema creation) — used `ReviewMemo`, `InteractiveReviewItem`, `InteractiveReviewMemo` from `backend/app/schemas/review.py`
+
+**Next Tasks:**
+- P4.3: Implement reviewer agent normalization (hr, technical, ats)
+- P4.4: Integrate normalization into review pipeline

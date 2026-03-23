@@ -485,7 +485,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
 
 ### Implementation Tasks
 
-- [ ] **P4.1: Extend review schemas for interaction**
+- [x] **P4.1: Extend review schemas for interaction**
   - Update `backend/app/schemas/review.py`
   - Add:
     - `InteractiveReviewItem` (item_key, recommendation, rationale, severity)
