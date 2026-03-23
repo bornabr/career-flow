@@ -1816,3 +1816,54 @@ P3.4 enables:
 - AST signature inspection confirms both async node signatures return `dict[str, Any]`
 - `python3 -m py_compile app/graph/nodes_chat.py` succeeds
 - Environment limitation: runtime import check via Poetry is blocked by local Python/venv mismatch and missing backend dependencies in system Python
+
+## [2026-03-22] Task: P3.6 - Build Chat Graphs
+
+### Graph builder pattern applied
+
+- Created `backend/app/graph/build_chat_graphs.py` with two builders:
+  - `build_intake_graph() -> StateGraph`
+  - `build_refinement_graph() -> StateGraph`
+- Both builders follow the generation graph style:
+  1. `StateGraph(StateType)`
+  2. `add_node(...)`
+  3. `set_entry_point(...)`
+  4. `add_edge(node, END)`
+  5. return uncompiled graph
+
+### Graph structures
+
+**Intake graph:**
+- State: `IntakeState`
+- Node: `intake` → `intake_node`
+- Flow: START → intake → END
+
+**Refinement graph:**
+- State: `RefinementState`
+- Node: `refinement` → `refinement_node`
+- Flow: START → refinement → END
+
+### Registry integration pattern
+
+- Updated `backend/app/graph/registry.py` to import chat graph builders.
+- Added:
+  - `get_intake_graph(checkpointer=None) -> CompiledStateGraph`
+  - `get_refinement_graph(checkpointer=None) -> CompiledStateGraph`
+- Both follow existing `get_generation_graph()` behavior:
+  - default `checkpointer = MemorySaver()` when None
+  - build via corresponding builder function
+  - compile via `.compile(checkpointer=checkpointer)`
+
+### Mermaid verification
+
+```mermaid
+graph LR
+    START --> intake
+    intake --> END
+```
+
+```mermaid
+graph LR
+    START --> refinement
+    refinement --> END
+```
