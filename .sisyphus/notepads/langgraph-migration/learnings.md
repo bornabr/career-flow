@@ -1771,3 +1771,48 @@ P3.4 enables:
 - Chat flow orchestration in P3.6
 - Chat endpoint integration in P3.7+
 
+## [2026-03-22] Task: P3.5 - Create Chat Graph Nodes
+
+### What Was Created
+
+**File: `backend/app/graph/nodes_chat.py`**
+- Added `intake_node(state: IntakeState, config: RunnableConfig) -> dict[str, Any]`
+- Added `refinement_node(state: RefinementState, config: RunnableConfig) -> dict[str, Any]`
+- Followed the same node wrapper structure used in `nodes_generation.py`
+
+### Implementation Details
+
+1. **Runtime config extraction**
+   - Both nodes use: `runtime: GraphRuntimeConfig = config["configurable"]["runtime"]`
+
+2. **Intake node wiring**
+   - Builds `conversation_history` from `state["messages"]` into `{role, content}` dict items
+   - Calls `run_intake_turn(...)` with state inputs + runtime model/api key
+   - Returns:
+     - `assistant_reply`
+     - `ready_to_generate`
+     - `extracted_constraints`
+     - `missing_fields`
+
+3. **Refinement node wiring**
+   - Calls `run_refinement_turn(...)` with:
+     - `current_cv_dict`
+     - `resume_text`
+     - `job_description`
+     - `latest_user_message`
+     - runtime model/api key
+   - Returns:
+     - `updated_cv_dict`
+     - `assistant_reply`
+
+4. **SSE streaming pattern**
+   - Both nodes call `get_stream_writer()`
+   - Emits custom progress events:
+     - `chat.intake.started` / `chat.intake.completed`
+     - `chat.refinement.started` / `chat.refinement.completed`
+
+### Verification Notes
+
+- AST signature inspection confirms both async node signatures return `dict[str, Any]`
+- `python3 -m py_compile app/graph/nodes_chat.py` succeeds
+- Environment limitation: runtime import check via Poetry is blocked by local Python/venv mismatch and missing backend dependencies in system Python

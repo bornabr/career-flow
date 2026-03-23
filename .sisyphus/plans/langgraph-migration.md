@@ -343,7 +343,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     ```
   - **Verification:** Import states, inspect types
 
-- [ ] **P3.5: Create chat graph nodes**
+- [x] **P3.5: Create chat graph nodes**
   - Create `backend/app/graph/nodes_chat.py`
   - Implement:
     - `intake_node(state: IntakeState, config) -> dict`
