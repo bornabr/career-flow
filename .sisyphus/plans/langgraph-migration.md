@@ -501,7 +501,7 @@ Migrate the career-flow AI resume tailoring app from manual `asyncio.gather` pip
     - Converts raw ReviewMemo to InteractiveReviewMemo
   - **Verification:** Unit test with sample ReviewMemo
 
-- [ ] **P4.3: Add review_gate node to generation graph**
+- [x] **P4.3: Add review_gate node to generation graph**
   - Update `backend/app/graph/build_generation_graph.py`
   - Add `review_gate` node after parallel reviewer nodes:
     - Normalizes all ReviewMemo results

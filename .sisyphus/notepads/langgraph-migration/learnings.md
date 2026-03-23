@@ -2113,3 +2113,44 @@ graph LR
 **Next Tasks:**
 - P4.3: Implement reviewer agent normalization (hr, technical, ats)
 - P4.4: Integrate normalization into review pipeline
+
+## [2026-03-23 09:43] Task: P4.3 - review_gate Interrupt Node
+
+**Status:** ✅ COMPLETED
+
+**Files Modified:**
+- `backend/app/graph/state.py`
+- `backend/app/graph/events.py`
+- `backend/app/graph/build_generation_graph.py`
+
+**What was implemented:**
+- Added GenerationState fields for HITL review approval flow:
+  - `interactive_reviews: list[InteractiveReviewMemo]`
+  - `awaiting_review_approval: bool`
+  - `review_decisions: dict[str, bool] | None`
+- Added SSE helper `emit_interrupt_pending(writer, payload)` emitting:
+  - `type: "interrupt.pending"`
+  - `timestamp: ISO UTC`
+  - `data: payload`
+- Added `review_gate` node after `review_join` that:
+  - Normalizes `state["reviews"]` with `normalize_review_memo(...)`
+  - Recomputes `consensus_score` from collected review scores
+  - Builds `ReviewApprovalPayload` and emits interrupt SSE event
+  - Calls `interrupt(value=payload_dict)` to pause graph execution
+  - Parses resume value into `review_decisions` when provided
+
+**Graph routing updates:**
+- Replaced conditional routing after `review_join` with fixed edge:
+  - `review_join -> review_gate`
+- Added conditional routing after `review_gate`:
+  - any accepted decision -> `synthesis`
+  - no accepted decisions / missing decisions -> `validate`
+
+**Gotchas / patterns:**
+- `interrupt(...)` return handling is needed to support resumed decisions in-node.
+- Payload model uses `hallucination_report` as `dict[str, object] | None`, so graph node must pass dumped dict (`model_dump`) not raw Pydantic model.
+- LSP in this repo currently reports broad pre-existing import/type diagnostics for LangGraph modules; Python syntax compile on modified files passes.
+
+**Verification run:**
+- `python3 -m py_compile backend/app/graph/state.py backend/app/graph/events.py backend/app/graph/build_generation_graph.py` ✅
+- `lsp_diagnostics(filePath="backend/app/graph", extension=".py")` executed (pre-existing baseline diagnostics still present in graph package)

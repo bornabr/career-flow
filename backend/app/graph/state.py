@@ -4,7 +4,7 @@ import operator
 from typing import Annotated, Any, TypedDict
 
 from app.schemas.cv import CV
-from app.schemas.review import ReviewMemo, HallucinationReport, ReviewPanelResult
+from app.schemas.review import ReviewMemo, HallucinationReport, ReviewPanelResult, InteractiveReviewMemo
 
 
 class GenerationState(TypedDict, total=False):
@@ -38,5 +38,8 @@ class GenerationState(TypedDict, total=False):
     review_errors: Annotated[list[dict[str, str]], operator.add]
     hallucination_report: HallucinationReport | None
     review_panel: ReviewPanelResult | None
+    interactive_reviews: list[InteractiveReviewMemo]
+    awaiting_review_approval: bool
+    review_decisions: dict[str, bool] | None
     validation_result: dict[str, Any] | None
     final_response: dict[str, Any] | None

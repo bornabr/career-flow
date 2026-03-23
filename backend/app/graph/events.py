@@ -25,13 +25,13 @@ which accepts a single JSON-serializable dict argument.
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 
 def _now_iso() -> str:
     """Return current UTC timestamp in ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def emit_run_started(writer: Callable[[dict[str, Any]], None], thread_id: str, review_mode: bool) -> None:
@@ -167,6 +167,15 @@ def emit_result(writer: Callable[[dict[str, Any]], None], response: dict[str, An
         "type": "result",
         "timestamp": _now_iso(),
         "data": response,
+    })
+
+
+def emit_interrupt_pending(writer: Callable[[dict[str, Any]], None], payload: dict[str, Any]) -> None:
+    """Emit interrupt.pending event when review approval is required."""
+    writer({
+        "type": "interrupt.pending",
+        "timestamp": _now_iso(),
+        "data": payload,
     })
 
 
