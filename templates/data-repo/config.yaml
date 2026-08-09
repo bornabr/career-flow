@@ -1,0 +1,17 @@
+# career-flow user configuration (read by all flows before acting)
+plugin:
+  repo: "{{PLUGIN_REPO}}"              # GitHub owner/name of the plugin repo
+  local_path: "{{PLUGIN_LOCAL_PATH}}"  # local clone of the plugin repo
+
+capture:
+  checkin_interval_days: 14
+  passive:
+    enabled: false                     # Phase 3 feature; keep false
+    sources: [github, claude_sessions]
+
+memory:
+  staleness_months: 6                  # maintain flow flags entries older than this
+
+outputs:
+  resume:
+    engine: typst                      # Phase 2 feature
