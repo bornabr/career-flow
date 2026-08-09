@@ -7,37 +7,48 @@ Borna wants a system that tracks and maintains career knowledge — work experie
 The previous incarnation of this repo was a heavyweight FastAPI + LangGraph application; it was deliberately reset. The new approach is an **agent plugin**: the agent harness provides the runtime, the plugin provides structured flows and a plain-file knowledge base.
 
 Decisions made during brainstorming:
-- **Audience:** personal first, shareable later → strict separation of plugin code from personal data inside this repo, so the plugin can be split out and published later.
+- **Audience:** personal first, shareable later → plugin code and personal data live in **separate repos** from day one, so the plugin can be published without ever touching personal data.
 - **Portability:** full flows in Claude Code, Claude Cowork, Codex, and ChatGPT Work.
 - **Architecture:** plain files + Agent Skills as the engine; git/GitHub as sync; MCP server deferred to a later phase as the uniform ChatGPT bridge.
-- **Data home:** this repo (`career-flow`), pushed to a **private** GitHub remote.
+- **Data home:** a **separate private GitHub-synced repo** (the "data repo", e.g., `career-data`), distinct from this plugin repo. This repo (`career-flow`) holds only the shareable plugin code. The bootstrap flow scaffolds the data repo.
 - **Capture modes:** bootstrap import, guided capture, periodic check-ins, passive capture — each individually toggleable in user config.
 - **Outputs (all wanted, phased):** tailored resume (Typst → PDF), interview prep pack, cover letters/misc, personal web page (GitHub Pages, later phase).
 - **Check-ins:** manually triggered command, no scheduling infra.
 
 ## Repo Layout
 
+Two repos with a clean boundary: the **plugin repo** (this one, shareable) and the **data repo** (private, scaffolded by the bootstrap flow). Agents do career work with the data repo as their working directory; the plugin is installed globally in each tool.
+
+**Plugin repo — `career-flow` (this repo):**
+
 ```
 career-flow/
-├── AGENTS.md                    # universal entry point: conventions ANY agent must follow
+├── .claude-plugin/plugin.json   # Claude Code plugin manifest
+├── skills/
+│   ├── bootstrap/SKILL.md       # scaffold the data repo + one-time import: resume/LinkedIn/etc. + gap interview
+│   ├── capture/SKILL.md         # guided capture: project / accomplishment / publication / role change
+│   ├── checkin/SKILL.md         # periodic career journal (covers gap since last check-in)
+│   ├── maintain/SKILL.md        # memory management: staleness review, dedup/merge, link repair, index rebuild
+│   ├── resume/SKILL.md          # job posting → tailored Typst resume → PDF
+│   ├── interview-prep/SKILL.md  # posting/company → prep pack (questions ↔ STAR stories, gap analysis)
+│   ├── cover-letter/SKILL.md    # cover letters, LinkedIn summaries, bio blurbs
+│   └── webpage/SKILL.md         # static portfolio site from public-visibility entries (later phase)
+├── hooks/                       # optional passive-capture hook (opt-in via config)
+├── templates/                   # data-repo scaffold (AGENTS.md, config.yaml, entry templates), Typst resume template, prep-pack template
+├── scripts/
+│   └── validate                 # schema check, link check, INDEX rebuild (plain script, any agent can run)
+└── docs/superpowers/specs/      # design docs (this spec)
+```
+
+**Data repo — e.g., `career-data` (private, created by bootstrap from the scaffold templates):**
+
+```
+career-data/
+├── AGENTS.md                    # universal entry point: conventions ANY agent must follow; points at plugin flows
 ├── CLAUDE.md                    # thin pointer to AGENTS.md
-├── config.yaml                  # user config: capture toggles, cadences, output prefs
-├── plugin/                      # the shareable part (future marketplace plugin)
-│   ├── .claude-plugin/plugin.json
-│   ├── skills/
-│   │   ├── bootstrap/SKILL.md       # one-time import: resume/LinkedIn/etc. + gap interview
-│   │   ├── capture/SKILL.md         # guided capture: project / accomplishment / publication / role change
-│   │   ├── checkin/SKILL.md         # periodic career journal (covers gap since last check-in)
-│   │   ├── maintain/SKILL.md        # memory management: staleness review, dedup/merge, link repair, index rebuild
-│   │   ├── resume/SKILL.md          # job posting → tailored Typst resume → PDF
-│   │   ├── interview-prep/SKILL.md  # posting/company → prep pack (questions ↔ STAR stories, gap analysis)
-│   │   ├── cover-letter/SKILL.md    # cover letters, LinkedIn summaries, bio blurbs
-│   │   └── webpage/SKILL.md         # static portfolio site from public-visibility entries (later phase)
-│   ├── hooks/                       # optional passive-capture hook (opt-in via config)
-│   ├── templates/                   # entry templates, Typst resume template, prep-pack template
-│   └── scripts/
-│       └── validate                 # schema check, link check, INDEX rebuild (plain script, any agent can run)
-├── data/                        # personal knowledge base (private; the reason the repo is private)
+├── config.yaml                  # user config: capture toggles, cadences, staleness_months, output prefs, plugin location
+├── .github/workflows/validate.yml  # CI: runs the validate script on every push
+├── data/
 │   ├── profile.md               # identity, contact, links, headline, preferences
 │   ├── experiences/<slug>.md    # jobs/roles
 │   ├── projects/<slug>.md
@@ -47,9 +58,10 @@ career-flow/
 │   ├── stories/<slug>.md        # STAR stories, linked to experiences/projects
 │   ├── inbox.md                 # staging area for passive-capture candidates
 │   └── INDEX.md                 # generated compact index — the recall layer any agent loads first
-├── outputs/                     # generated artifacts: resumes/, prep-packs/, letters/ (dated, per-company)
-└── docs/superpowers/specs/      # design docs (this spec gets committed here)
+└── outputs/                     # generated artifacts: resumes/, prep-packs/, letters/ (dated, per-company)
 ```
+
+How the two find each other: skills resolve the data repo from the current working directory (presence of `config.yaml` + `data/`), falling back to a `data_repo` path recorded in `~/.config/career-flow/config` by bootstrap. The data repo's `config.yaml` records where the plugin lives for non-Claude tools (Codex/ChatGPT instructions reference it).
 
 ## Data Model
 
@@ -79,8 +91,8 @@ tags: [ai-agents, plugins]
 
 ## Automatic Memory Management (career-specific)
 
-1. **Write-time discipline:** every capture flow ends by (a) updating cross-links — a new project adds/updates its skill files, a story links its experience; (b) running `plugin/scripts/validate`, which checks frontmatter schema, broken links, orphan skills, and regenerates INDEX.md. Validation failure blocks flow completion.
-2. **CI enforcement:** a GitHub Action runs the same validate script on push — so even edits made from ChatGPT Work (via GitHub connector) or Codex cloud get schema-checked.
+1. **Write-time discipline:** every capture flow ends by (a) updating cross-links — a new project adds/updates its skill files, a story links its experience; (b) running the plugin's `scripts/validate` against the data repo, which checks frontmatter schema, broken links, orphan skills, and regenerates INDEX.md. Validation failure blocks flow completion.
+2. **CI enforcement:** the data repo's GitHub Action checks out the plugin repo alongside and runs the same validate script on every push — so even edits made from ChatGPT Work (via GitHub connector) or Codex cloud get schema-checked.
 3. **Staleness review:** `last_verified` dates; the maintain flow surfaces entries older than `staleness_months` (config) — "is this role still current? are these skills still accurate?"
 4. **Consolidation:** the maintain flow detects near-duplicate skills/stories and proposes merges; archived items get compressed, never silently deleted.
 5. **Inbox pattern:** passive capture never writes entities directly — it appends candidates to `data/inbox.md`; the next capture/check-in flow triages the inbox. Decouples noticing from committing.
@@ -104,15 +116,15 @@ tags: [ai-agents, plugins]
 | Tool | How it works |
 |---|---|
 | Claude Code / Cowork | Full plugin: skills, optional hook, slash-command entry points |
-| Codex CLI | `AGENTS.md` at repo root + the same SKILL.md files (Agent Skills format is portable; installed/symlinked into Codex's skills location) |
-| ChatGPT Work | Private repo via GitHub connector; a condensed `plugin/chatgpt-instructions.md` pasted as project instructions; writes land as commits/PRs, CI validates them |
+| Codex CLI | `AGENTS.md` at the data repo root + the same SKILL.md files (Agent Skills format is portable; installed/symlinked into Codex's skills location) |
+| ChatGPT Work | Private data repo via GitHub connector; condensed instructions (generated from the plugin's templates into the data repo) pasted as project instructions; writes land as commits/PRs, data-repo CI validates them |
 | (Later) | Thin MCP server exposing capture/search/generate tools for a uniform ChatGPT/remote story |
 
 Git is the sync layer: flows `git pull` before writing and commit after; conflicts surface as normal git conflicts.
 
 ## Implementation Phases
 
-1. **Foundation** — repo layout, entity schema + templates, `config.yaml`, `AGENTS.md`/`CLAUDE.md`, validate script + INDEX generation, private GitHub remote + CI, **bootstrap** and **capture** skills. *End state: knowledge base populated from existing resume, new entries capturable.*
+1. **Foundation** — plugin repo layout, entity schema + data-repo scaffold templates (`AGENTS.md`, `CLAUDE.md`, `config.yaml`, CI workflow), validate script + INDEX generation, **bootstrap** skill (scaffolds the private data repo + GitHub remote, then imports) and **capture** skill. *End state: separate private data repo created and populated from existing resume; new entries capturable.*
 2. **Outputs** — **resume** (Typst template + compile), **cover-letter**, **interview-prep** skills.
 3. **Maintenance cadence** — **checkin** and **maintain** skills; passive-capture hook (opt-in).
 4. **Web page + adapter polish** — **webpage** skill → GitHub Pages; Codex/ChatGPT instruction files tuned by real use.
@@ -124,14 +136,15 @@ Phase 1 is the first implementation plan; each later phase gets its own plan.
 
 - Validate script failure blocks capture-flow completion (agent must fix or revert).
 - Git: pull-before-write; on conflict, stop and surface to user.
-- Privacy: repo private; `visibility` frontmatter gates anything that leaves the repo (webpage); outputs directory reviewed before sending anywhere.
+- Privacy: data repo private and fully separate from the (eventually public) plugin repo; `visibility` frontmatter gates anything that leaves it (webpage); outputs directory reviewed before sending anywhere.
 
 ## Verification
 
-- Run `plugin/scripts/validate` against seeded sample data (valid + deliberately broken fixtures).
+- Run `scripts/validate` against seeded sample data (valid + deliberately broken fixtures).
 - End-to-end dry run: bootstrap with the real resume → capture one project → confirm INDEX.md and cross-links correct.
 - Compile the Typst template with sample data to PDF.
-- CI run on the GitHub remote passes.
+- CI run on the data repo's GitHub remote passes.
+- **User acceptance loop:** after each phase, Borna enters real career info and exercises the flows, outputs, and memory management, giving feedback that drives fixes before the next phase begins.
 
 ## Next Steps
 
