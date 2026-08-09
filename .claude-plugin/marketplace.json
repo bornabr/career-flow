@@ -1,0 +1,11 @@
+{
+  "name": "career-flow-marketplace",
+  "owner": { "name": "Borna Barahimi" },
+  "plugins": [
+    {
+      "name": "career-flow",
+      "source": "./",
+      "description": "Memory-backed career knowledge plugin"
+    }
+  ]
+}
