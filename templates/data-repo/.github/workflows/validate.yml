@@ -14,4 +14,5 @@ jobs:
       - name: validate entities and INDEX freshness
         run: |
           uv run .career-flow-plugin/scripts/validate.py .
+          git add -N data/INDEX.md
           git diff --exit-code data/INDEX.md
