@@ -139,3 +139,28 @@ def load_entities(data_dir: Path) -> tuple[dict[str, dict], list[str]]:
             errors.extend(check_schema(fm))
             entities[eid] = fm
     return entities, errors
+
+
+def check_links(entities: dict[str, dict]) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    referenced: set[str] = set()
+    for eid, entity in entities.items():
+        links = entity.get("links") or {}
+        if not isinstance(links, dict):
+            continue  # already reported by check_schema
+        targets: list[str] = []
+        for single in ("experience", "project"):
+            if isinstance(links.get(single), str):
+                targets.append(links[single])
+        if isinstance(links.get("skills"), list):
+            targets.extend(t for t in links["skills"] if isinstance(t, str))
+        for target in targets:
+            referenced.add(target)
+            if target not in entities:
+                errors.append(f"{eid}: linked id '{target}' does not exist")
+    warnings = [
+        f"orphan skill: '{eid}' is referenced by no other entity"
+        for eid, e in sorted(entities.items())
+        if e.get("type") == "skill" and eid not in referenced
+    ]
+    return errors, warnings
