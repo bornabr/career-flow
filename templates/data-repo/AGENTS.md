@@ -32,6 +32,12 @@ and job applications as Markdown files with YAML frontmatter.
 5. Never hand-edit `data/INDEX.md`.
 6. Commit with a descriptive message and push.
 
+## Non-Claude tools (Codex CLI, etc.)
+
+The career-flow skill files reference `${CLAUDE_PLUGIN_ROOT}` — a variable only
+Claude Code sets. In any other tool, read it as the plugin repo's local path from
+`config.yaml` → `plugin.local_path`. Everything else in the skills applies as written.
+
 ## data/inbox.md
 
 Staging area for automatically noticed accomplishment candidates. Never promote inbox
