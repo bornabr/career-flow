@@ -26,7 +26,13 @@ def data_repo(tmp_path):
     return tmp_path
 
 
-def write_entity(repo, dirname, filename, frontmatter, body="Body.\n"):
+def write_entity(
+    repo,
+    dirname,
+    filename,
+    frontmatter,
+    body="# Narrative\n\nRefined narrative.\n\n## Raw notes\n\nOriginal words.\n",
+):
     path = repo / "data" / dirname / filename
     path.write_text(f"---\n{frontmatter}---\n\n{body}")
     return path

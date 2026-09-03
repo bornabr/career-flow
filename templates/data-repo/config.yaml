@@ -1,7 +1,6 @@
 # career-flow user configuration (read by all flows before acting)
 plugin:
-  repo: "{{PLUGIN_REPO}}"              # GitHub owner/name of the plugin repo
-  local_path: "{{PLUGIN_LOCAL_PATH}}"  # local clone of the plugin repo
+  repo: "{{PLUGIN_REPO}}"  # GitHub owner/name of the plugin repo
 
 capture:
   checkin_interval_days: 14
