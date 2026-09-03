@@ -1,11 +1,4 @@
-rendercv_output
-
+__pycache__/
+.pytest_cache/
+*.pyc
 .DS_Store
-*.json
-*.pdf
-
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-.env
