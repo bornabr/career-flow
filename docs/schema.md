@@ -21,7 +21,7 @@ Filename stem MUST equal `id`. `data/profile.md`, `data/inbox.md`, `data/INDEX.m
 - `id` (string, prefixed as above)
 - `type` (one of the seven types)
 - `title` (string)
-- `summary` (one line; shown in INDEX.md — write it as the recall hook)
+- `summary` (non-empty string, one line; shown in INDEX.md — write it as the recall hook)
 - `status`: `active` | `completed` | `archived`
 - `visibility`: `public` | `private`  (public = eligible for the future webpage)
 - `last_verified`: `YYYY-MM-DD` (updated whenever the user confirms the entry is accurate)
@@ -39,13 +39,16 @@ Filename stem MUST equal `id`. `data/profile.md`, `data/inbox.md`, `data/INDEX.m
 
 ## Optional on any entity
 
-- `links`: `experience` (single id), `project` (single id), `skills` (list of ids). Every referenced id must exist.
+- `links`: `experience` (single experience id), `project` (single project id),
+  `skills` (list of skill ids). Every referenced id must exist and match the link type.
 - `tags` (list of strings), `flags` (list; e.g. `needs-metrics` when the reviewer pass found gaps the user could not fill)
 
 ## Body
 
-- `# Narrative` — refined, resume-ready prose: accomplishments with metrics, context, STAR notes.
-- `## Raw notes` — the user's original words from capture, preserved verbatim (provenance).
+- `# Narrative` — required, with non-empty refined, resume-ready prose: accomplishments
+  with metrics, context, STAR notes.
+- `## Raw notes` — required after Narrative, with the user's non-empty original words
+  from capture preserved verbatim (provenance).
 
 ## Warnings (non-fatal)
 
