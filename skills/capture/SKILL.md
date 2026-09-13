@@ -5,6 +5,18 @@ description: Use when the user wants to log career knowledge - a project, accomp
 
 # Capture — guided career entry
 
+## Resolve bundled resources
+
+Before acting, resolve `<plugin-root>` to the plugin directory containing `scripts/`,
+`templates/`, and this skill's parent `skills/` directory:
+
+- In Claude Code, use the expanded `${CLAUDE_PLUGIN_ROOT}` value.
+- Otherwise derive it from the loaded `SKILL.md` path (two directories above this file).
+
+Verify `<plugin-root>/scripts/validate.py` and `<plugin-root>/templates/entities`
+exist. Stop with a clear installation error if they do not. Never run a command with
+an unresolved placeholder and do not rely on a plugin path saved by another host.
+
 ## Preconditions
 
 - Locate the data repo: current directory if it has `config.yaml` + `data/`; otherwise
@@ -27,17 +39,17 @@ description: Use when the user wants to log career knowledge - a project, accomp
    - story: situation, task, action, result (metrics), which experience/project it belongs to
    - application: company, role, date, posting summary, resume variant used, contacts
 3. **Draft the entity.** Copy the matching template from
-   `${CLAUDE_PLUGIN_ROOT}/templates/entities/`, fill it in. Slug rules: lowercase,
+   `<plugin-root>/templates/entities/`, fill it in. Slug rules: lowercase,
    hyphens, short (`proj-career-flow`). Filename = id. Put the user's original words
    verbatim under `## Raw notes`.
 4. **Update cross-links.** Add skill ids to `links.skills`; CREATE any missing skill
    files from the skill template (brief summary is enough). If updating an existing
    entity, bump its `last_verified` to today.
-5. **Reviewer pass.** Work through `${CLAUDE_PLUGIN_ROOT}/templates/reviewer-checklist.md`.
+5. **Reviewer pass.** Work through `<plugin-root>/templates/reviewer-checklist.md`.
    Show the user the final draft and get their OK.
 6. **Triage inbox (quick).** If `data/inbox.md` has unchecked items, ask whether to
    handle any now; promote or delete per the user's answer.
-7. **Validate.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/validate.py .` — fix every ERROR
+7. **Validate.** Run `"<plugin-root>/scripts/validate.py" .` — fix every ERROR
    and rerun until it prints OK (this also regenerates INDEX.md).
 8. **Commit and push.** `git add -A && git commit` with a message like
    `capture: add proj-career-flow` then `git push`.

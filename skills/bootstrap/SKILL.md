@@ -5,6 +5,19 @@ description: Use when setting up career-flow for the first time - scaffolds the 
 
 # Bootstrap — create and seed the career-data repo
 
+## Resolve bundled resources
+
+Before acting, resolve `<plugin-root>` to the plugin directory containing `scripts/`,
+`templates/`, and this skill's parent `skills/` directory:
+
+- In Claude Code, use the expanded `${CLAUDE_PLUGIN_ROOT}` value.
+- Otherwise derive it from the loaded `SKILL.md` path (two directories above this file).
+
+Verify `<plugin-root>/scripts/validate.py` and `<plugin-root>/templates/data-repo`
+exist. Stop with a clear installation error if they do not. Never run a command with
+an unresolved placeholder and never persist an installed plugin root; hosts may move
+cached plugins during updates.
+
 ## Guard
 
 If `~/.config/career-flow/config` already exists and points at a valid data repo, tell
@@ -14,11 +27,11 @@ explicitly want a second repo.
 ## Part 1 — scaffold the repo
 
 1. Ask where the data repo should live. Default: `~/Projects/career-data`.
-2. Copy the scaffold: `cp -R ${CLAUDE_PLUGIN_ROOT}/templates/data-repo <chosen-path>`.
-3. Replace placeholders in `<path>/config.yaml` and `<path>/.github/workflows/validate.yml`:
-   - `{{PLUGIN_REPO}}` → the plugin's GitHub `owner/name` (derive from
-     `git -C ${CLAUDE_PLUGIN_ROOT} remote get-url origin`; if no remote, ask the user).
-   - `{{PLUGIN_LOCAL_PATH}}` → absolute path of `${CLAUDE_PLUGIN_ROOT}`.
+2. Copy the scaffold: `cp -R "<plugin-root>/templates/data-repo" <chosen-path>`.
+3. Replace the placeholder in `<path>/.github/workflows/validate.yml`:
+   - `{{PLUGIN_REPO}}` → the plugin's GitHub `owner/name`. Derive it from
+     `git -C "<plugin-root>" remote get-url origin` when available, otherwise from
+     the `repository` URL in a plugin manifest; ask the user only if neither works.
 4. `git init` the repo, initial commit of the scaffold.
 5. Create the private remote (ask permission first — this is an outward-facing action):
    `gh repo create <name> --private --source <path> --push`.
@@ -36,21 +49,21 @@ explicitly want a second repo.
    list, transcripts — whatever they have. Read what's provided.
 2. Fill `data/profile.md` (name, headline, contact, links) from the material + user.
 3. Parse the material into entities, newest first, using templates from
-   `${CLAUDE_PLUGIN_ROOT}/templates/entities/`:
+   `<plugin-root>/templates/entities/`:
    experiences, education, publications, obvious major projects, and skill files for
    the skills those entries reference. Filename = id; original resume wording goes in
    `## Raw notes` verbatim.
 4. **Gap interview, one question at a time, newest experiences first:** missing
    metrics, missing dates, notable projects the resume undersells, story-worthy
    moments (offer to create story entities). Apply
-   `${CLAUDE_PLUGIN_ROOT}/templates/reviewer-checklist.md` to every entry; use
+   `<plugin-root>/templates/reviewer-checklist.md` to every entry; use
    `flags: [needs-metrics]` where the user can't supply numbers — bootstrap should be
    thorough but not exhausting; the maintain flow revisits flagged entries later.
 5. Set every imported entry's `last_verified` to today.
 
 ## Part 3 — validate and push
 
-1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/validate.py <data-repo-path>` — fix every ERROR
+1. Run `"<plugin-root>/scripts/validate.py" <data-repo-path>` — fix every ERROR
    and rerun until OK.
 2. Review WARN lines (orphan skills are fine at this stage if the user wants them kept).
 3. `git add -A && git commit -m "bootstrap: import initial career knowledge base"` and push.

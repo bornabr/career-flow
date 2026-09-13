@@ -14,7 +14,8 @@ and job applications as Markdown files with YAML frontmatter.
 
 - Entities live in `data/{experiences,projects,skills,education,publications,stories,applications}/`.
 - One file per entity: `<id>.md`, id prefixes: exp- proj- skill- edu- pub- story- app-.
-- Full schema: `docs/schema.md` in the plugin repo (path in `config.yaml` → `plugin.local_path`).
+- Full schema: `<plugin-root>/docs/schema.md`, where `<plugin-root>` is resolved by
+  the active career-flow skill from its own installed path.
 - Required frontmatter on every entity: id, type, title, summary (one line), status
   (active|completed|archived), visibility (public|private), last_verified (YYYY-MM-DD).
 - Body: `# Narrative` (refined, metrics-heavy) and `## Raw notes` (user's words, verbatim —
@@ -28,15 +29,16 @@ and job applications as Markdown files with YAML frontmatter.
 3. Quality gate before finalizing any entry: does it have quantified impact, dates, and
    a one-line summary? If the user can't supply metrics, add `flags: [needs-metrics]`.
 4. After ANY change to `data/`: run the validate script and fix every ERROR:
-   `<plugin.local_path>/scripts/validate.py .`  (regenerates data/INDEX.md)
+   `"<plugin-root>/scripts/validate.py" .`  (regenerates data/INDEX.md)
 5. Never hand-edit `data/INDEX.md`.
 6. Commit with a descriptive message and push.
 
-## Non-Claude tools (Codex CLI, etc.)
+## Plugin location
 
-The career-flow skill files reference `${CLAUDE_PLUGIN_ROOT}` — a variable only
-Claude Code sets. In any other tool, read it as the plugin repo's local path from
-`config.yaml` → `plugin.local_path`. Everything else in the skills applies as written.
+Use the plugin root resolved by the active `bootstrap` or `capture` skill. Do not save
+or reuse another host's installed plugin path: Claude Code and Codex may install the
+same plugin in different versioned cache directories. If no career-flow skill is
+available, stop and ask the user to install or enable the plugin.
 
 ## data/inbox.md
 

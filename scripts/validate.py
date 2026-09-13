@@ -43,6 +43,8 @@ LEVEL_VALUES = {"beginner", "intermediate", "advanced", "expert"}
 
 FULL_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")      # last_verified, application date
 LOOSE_DATE_RE = re.compile(r"^\d{4}(-\d{2})?(-\d{2})?$")  # start/end/publication date
+NARRATIVE_HEADING_RE = re.compile(r"(?m)^# Narrative[ \t]*$")
+RAW_NOTES_HEADING_RE = re.compile(r"(?m)^## Raw notes[ \t]*$")
 
 
 def parse_frontmatter(text: str) -> tuple[dict | None, str | None]:
@@ -64,12 +66,37 @@ def _date_ok(value, pattern) -> bool:
     return isinstance(value, str) and bool(pattern.match(value))
 
 
+def check_body(text: str, eid: str) -> list[str]:
+    errors: list[str] = []
+    narrative = NARRATIVE_HEADING_RE.search(text)
+    raw_notes = RAW_NOTES_HEADING_RE.search(text)
+    if narrative is None:
+        errors.append(f"{eid}: body must contain '# Narrative'")
+    if raw_notes is None:
+        errors.append(f"{eid}: body must contain '## Raw notes'")
+    if narrative is None or raw_notes is None:
+        return errors
+    if raw_notes.start() < narrative.end():
+        errors.append(f"{eid}: '## Raw notes' must appear after '# Narrative'")
+        return errors
+    if not text[narrative.end():raw_notes.start()].strip():
+        errors.append(f"{eid}: Narrative must not be empty")
+    if not text[raw_notes.end():].strip():
+        errors.append(f"{eid}: Raw notes must not be empty")
+    return errors
+
+
 def check_schema(entity: dict) -> list[str]:
     eid = entity.get("id", "<no id>")
     errors: list[str] = []
     for field in COMMON_REQUIRED:
         if field not in entity or entity[field] in (None, ""):
             errors.append(f"{eid}: missing required field '{field}'")
+    for field in ("id", "type", "title", "summary"):
+        if field in entity and not isinstance(entity[field], str):
+            errors.append(f"{eid}: {field} must be a string")
+    if isinstance(entity.get("summary"), str) and "\n" in entity["summary"]:
+        errors.append(f"{eid}: summary must be one line")
     etype = entity.get("type")
     if etype not in TYPE_REQUIRED:
         errors.append(f"{eid}: unknown type '{etype}'")
@@ -97,11 +124,16 @@ def check_schema(entity: dict) -> list[str]:
     if not isinstance(links, dict):
         errors.append(f"{eid}: links must be a mapping")
         links = {}
-    if "skills" in links and not isinstance(links["skills"], list):
-        errors.append(f"{eid}: links.skills must be a list")
+    if "skills" in links:
+        if not isinstance(links["skills"], list):
+            errors.append(f"{eid}: links.skills must be a list")
+        else:
+            for index, target in enumerate(links["skills"]):
+                if not isinstance(target, str) or not target:
+                    errors.append(f"{eid}: links.skills[{index}] must be a non-empty id string")
     for single in ("experience", "project"):
-        if single in links and not isinstance(links[single], str):
-            errors.append(f"{eid}: links.{single} must be a single id string")
+        if single in links and (not isinstance(links[single], str) or not links[single]):
+            errors.append(f"{eid}: links.{single} must be a single non-empty id string")
     if etype == "story" and not (links.get("experience") or links.get("project")):
         errors.append(f"{eid}: story must link at least one experience or project")
     for listfield in ("tags", "flags", "contacts", "follow_ups"):
@@ -121,7 +153,8 @@ def load_entities(data_dir: Path) -> tuple[dict[str, dict], list[str]]:
             continue
         for path in sorted(subdir.glob("*.md")):
             rel = f"data/{dirname}/{path.name}"
-            fm, err = parse_frontmatter(path.read_text())
+            text = path.read_text()
+            fm, err = parse_frontmatter(text)
             if err:
                 errors.append(f"{rel}: {err}")
                 continue
@@ -137,31 +170,45 @@ def load_entities(data_dir: Path) -> tuple[dict[str, dict], list[str]]:
                 continue
             fm["_path"] = path
             errors.extend(check_schema(fm))
+            errors.extend(check_body(text, eid or rel))
             entities[eid] = fm
     return entities, errors
 
 
 def check_links(entities: dict[str, dict]) -> tuple[list[str], list[str]]:
     errors: list[str] = []
-    referenced: set[str] = set()
+    referenced_skills: set[str] = set()
     for eid, entity in entities.items():
         links = entity.get("links") or {}
         if not isinstance(links, dict):
             continue  # already reported by check_schema
-        targets: list[str] = []
-        for single in ("experience", "project"):
-            if isinstance(links.get(single), str):
-                targets.append(links[single])
+        targets: list[tuple[str, str, str]] = []
+        for single, expected_type in (("experience", "experience"), ("project", "project")):
+            if isinstance(links.get(single), str) and links[single]:
+                targets.append((f"links.{single}", links[single], expected_type))
         if isinstance(links.get("skills"), list):
-            targets.extend(t for t in links["skills"] if isinstance(t, str))
-        for target in targets:
-            referenced.add(target)
+            targets.extend(
+                (f"links.skills[{index}]", target, "skill")
+                for index, target in enumerate(links["skills"])
+                if isinstance(target, str) and target
+            )
+        for field, target, expected_type in targets:
             if target not in entities:
                 errors.append(f"{eid}: linked id '{target}' does not exist")
+                continue
+            actual_type = entities[target].get("type")
+            if actual_type != expected_type:
+                errors.append(
+                    f"{eid}: {field} must reference a {expected_type}, "
+                    f"but '{target}' is a {actual_type}"
+                )
+                continue
+            if expected_type == "skill":
+                referenced_skills.add(target)
     warnings = [
         f"orphan skill: '{eid}' is referenced by no other entity"
         for eid, e in sorted(entities.items())
-        if e.get("type") == "skill" and eid not in referenced
+        if e.get("type") == "skill" and eid not in referenced_skills
     ]
     return errors, warnings
 

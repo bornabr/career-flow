@@ -6,34 +6,30 @@ Your career data lives in a **separate private repo** (scaffolded by the `bootst
 never in this plugin repo. See `docs/superpowers/specs/2026-08-08-career-flow-plugin-design.md`
 for the full design and `docs/schema.md` for the entity schema.
 
-## Install (Claude Code)
+## Install
 
-    claude plugin marketplace add /Users/bornabarahimi/Projects/career-flow
+Clone this repository, then run the commands for your agent from the repository root.
+
+### Claude Code
+
+    claude plugin marketplace add .
     claude plugin install career-flow@career-flow-marketplace
 
-## Install (OpenAI Codex CLI)
+Invoke skills as `/career-flow:bootstrap` and `/career-flow:capture`.
 
-Codex supports the same Agent Skills format (SKILL.md). Symlink the skills into
-Codex's personal skills directory so they stay in sync with this repo:
+### OpenAI Codex CLI
 
-    mkdir -p ~/.codex/skills
-    ln -s /Users/bornabarahimi/Projects/career-flow/skills/bootstrap ~/.codex/skills/career-bootstrap
-    ln -s /Users/bornabarahimi/Projects/career-flow/skills/capture   ~/.codex/skills/career-capture
+    codex plugin marketplace add .
+    codex plugin add career-flow@career-flow-marketplace
 
-Skills load at Codex startup and activate automatically when your request matches
-their description (e.g., "set up my career knowledge base", "log a new project").
-
-Two Codex-specific notes:
-
-- `${CLAUDE_PLUGIN_ROOT}` in the skill instructions is a Claude Code variable.
-  In Codex it means this plugin repo's path — recorded as `plugin.local_path`
-  in your data repo's `config.yaml` (the data repo's `AGENTS.md` says this too).
-- Always run Codex from your career-data repo so its `AGENTS.md` conventions load.
+Start a new Codex session after installation. Invoke skills as
+`$career-flow:bootstrap` and `$career-flow:capture`, or describe the matching task
+and let Codex activate the skill automatically.
 
 ## First run
 
-Invoke the `career-flow:bootstrap` skill — it scaffolds your private career-data repo
-and imports your existing resume.
+Invoke the `career-flow:bootstrap` skill using the syntax for your agent above. It
+scaffolds your private career-data repo and imports your existing resume.
 
 ## Development
 

@@ -1,5 +1,6 @@
 {
   "name": "career-flow-marketplace",
+  "description": "Career Flow plugins",
   "owner": { "name": "Borna Barahimi" },
   "plugins": [
     {

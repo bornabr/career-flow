@@ -60,5 +60,15 @@ def test_main_errors_no_index(vmod, data_repo, capsys):
     assert "ERROR:" in capsys.readouterr().out
 
 
+def test_main_rejects_entity_without_required_body(vmod, data_repo, capsys):
+    project = VALID_PROJECT.replace("links:\n  skills: [skill-python]\n", "")
+    write_entity(data_repo, "projects", "proj-alpha.md", project, body="")
+    rc = vmod.main([str(data_repo)])
+    assert rc == 1
+    output = capsys.readouterr().out
+    assert "# Narrative" in output
+    assert "## Raw notes" in output
+
+
 def test_main_missing_data_dir(vmod, tmp_path):
     assert vmod.main([str(tmp_path)]) == 2

@@ -76,3 +76,25 @@ def test_duplicate_ids(vmod, data_repo):
     write_entity(data_repo, "projects", "proj-beta.md", dup)
     _, errors = vmod.load_entities(data_repo / "data")
     assert any("duplicate" in e for e in errors)
+
+
+def test_summary_must_be_one_line(vmod):
+    entity = {"id": "proj-a", "type": "project", "title": "A",
+              "summary": "first line\nsecond line", "status": "active",
+              "visibility": "private", "last_verified": "2026-08-08",
+              "start": "2026-01"}
+    errors = vmod.check_schema(entity)
+    assert any("summary must be one line" in e for e in errors)
+
+
+def test_body_requires_narrative_and_raw_notes(vmod):
+    errors = vmod.check_body("---\nid: proj-a\n---\n", "proj-a")
+    assert any("# Narrative" in e for e in errors)
+    assert any("## Raw notes" in e for e in errors)
+
+
+def test_body_sections_must_be_non_empty(vmod):
+    text = "---\nid: proj-a\n---\n# Narrative\n\n## Raw notes\n"
+    errors = vmod.check_body(text, "proj-a")
+    assert any("Narrative must not be empty" in e for e in errors)
+    assert any("Raw notes must not be empty" in e for e in errors)

@@ -42,3 +42,30 @@ links:
     write_entity(data_repo, "stories", "story-x.md", story)
     errors, _ = vmod.check_links(_load(vmod, data_repo))
     assert any("exp-ghost" in e for e in errors)
+
+
+def test_link_target_must_match_declared_type(vmod, data_repo):
+    project = VALID_PROJECT.replace("links:\n  skills: [skill-python]", "links:\n  skills: []")
+    story = """id: story-x
+type: story
+title: X
+summary: s
+status: active
+visibility: private
+last_verified: 2026-08-08
+links:
+  experience: proj-alpha
+"""
+    write_entity(data_repo, "projects", "proj-alpha.md", project)
+    write_entity(data_repo, "stories", "story-x.md", story)
+    errors, _ = vmod.check_links(_load(vmod, data_repo))
+    assert any("links.experience" in e and "project" in e for e in errors)
+
+
+def test_skill_links_require_string_ids(vmod):
+    entity = {"id": "proj-a", "type": "project", "title": "A", "summary": "s",
+              "status": "active", "visibility": "private",
+              "last_verified": "2026-08-08", "start": "2026-01",
+              "links": {"skills": [123]}}
+    errors = vmod.check_schema(entity)
+    assert any("links.skills[0]" in e for e in errors)
