@@ -45,6 +45,14 @@ available, stop and ask the user to install or enable the plugin.
 Staging area for automatically noticed accomplishment candidates. Never promote inbox
 items to entities without the user confirming; delete rejected items.
 
+## Generated outputs
+
+Use the installed career-flow `resume`, `cover-letter`, `interview-prep`, and
+`outreach` skills for Phase 2 work. Generated artifacts stay under `outputs/` in
+this private repo, with source ids and tailoring notes alongside them. A resume
+variant is recorded in an application entity only after the user confirms it was
+actually used. Outreach skills draft messages; they never send them.
+
 ## Privacy
 
 Everything here is private by default. `visibility: public` marks an entry as eligible

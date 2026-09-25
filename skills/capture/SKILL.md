@@ -35,7 +35,8 @@ an unresolved placeholder and do not rely on a plugin path saved by another host
 2. **Interview, one question at a time.** Cover, per type:
    - project/experience: what/where/when, your specific role, impact WITH metrics,
      skills used, anything story-worthy
-   - publication: title, venue, date, co-authors, your contribution, url
+   - publication: title, venue, date, co-authors, your contribution, paper URL,
+     and code repository URL if public; verify links before storing them
    - story: situation, task, action, result (metrics), which experience/project it belongs to
    - application: company, role, date, posting summary, resume variant used, contacts
 3. **Draft the entity.** Copy the matching template from

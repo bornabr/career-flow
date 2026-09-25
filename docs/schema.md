@@ -32,10 +32,12 @@ Filename stem MUST equal `id`. `data/profile.md`, `data/inbox.md`, `data/INDEX.m
 - project: required `start`; optional `end`, `org` (display text)
 - skill: optional `level`: `beginner` | `intermediate` | `advanced` | `expert`
 - education: required `org` (institution), `start`; optional `end`, `credential` (string)
-- publication: required `venue` (string), `date` (`YYYY` or `YYYY-MM` or `YYYY-MM-DD`); optional `url`
+- publication: required `venue` (string), `date` (`YYYY` or `YYYY-MM` or `YYYY-MM-DD`);
+  optional `url` (paper/publication page) and `code_url` (verified code repository), both HTTP(S) URLs
 - story: no extra required fields, but `links` MUST reference at least one `experience` or `project`
 - application: required `company`, `role`, `date` (`YYYY-MM-DD`); optional `resume_variant` (repo-relative
-  path to the resume PDF used), `contacts` (list of strings), `follow_ups` (list of `{date, note, done}`)
+  `outputs/resumes/.../*.pdf` path to the resume PDF actually used), `contacts` (list of non-empty strings),
+  `follow_ups` (list of `{date: YYYY-MM-DD, note: non-empty string, done: boolean}`)
 
 ## Optional on any entity
 

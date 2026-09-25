@@ -1,7 +1,7 @@
 {
   "name": "career-flow",
-  "version": "0.1.1",
-  "description": "Memory-backed career knowledge plugin: capture experiences, projects, skills, publications, and stories into a private git-synced knowledge base; generate resumes, interview prep, and more.",
+  "version": "0.2.1",
+  "description": "Private career knowledge plugin with capture, general or tailored resumes, cover letters, interview prep, and outreach drafts.",
   "author": { "name": "Borna Barahimi" },
   "repository": "https://github.com/bornabr/career-flow"
 }

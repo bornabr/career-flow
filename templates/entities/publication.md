@@ -5,7 +5,8 @@ title: PAPER / ARTICLE TITLE
 summary: ONE-LINE HOOK FOR INDEX
 venue: VENUE
 date: YYYY-MM
-# url: https://...
+# url: https://...       # paper or publication page
+# code_url: https://github.com/...  # verified code repository, if public
 status: completed
 visibility: private
 last_verified: YYYY-MM-DD

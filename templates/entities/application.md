@@ -6,6 +6,7 @@ summary: ONE-LINE HOOK FOR INDEX
 company: COMPANY
 role: ROLE
 date: YYYY-MM-DD
+# Add resume_variant only after this PDF is actually used for this application.
 # resume_variant: outputs/resumes/COMPANY-ROLE-DATE/resume.pdf
 # contacts: ["Jane Doe — recruiter — linkedin.com/in/..."]
 # follow_ups:

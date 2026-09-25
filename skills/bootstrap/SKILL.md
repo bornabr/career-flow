@@ -52,7 +52,8 @@ explicitly want a second repo.
    `<plugin-root>/templates/entities/`:
    experiences, education, publications, obvious major projects, and skill files for
    the skills those entries reference. Filename = id; original resume wording goes in
-   `## Raw notes` verbatim.
+   `## Raw notes` verbatim. For publications, retain verified paper and public code
+   repository URLs separately as `url` and `code_url` when available.
 4. **Gap interview, one question at a time, newest experiences first:** missing
    metrics, missing dates, notable projects the resume undersells, story-worthy
    moments (offer to create story entities). Apply

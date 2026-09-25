@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import re
 import sys
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -114,12 +116,27 @@ def check_schema(entity: dict) -> list[str]:
         if field in entity and entity[field] is not None \
                 and not _date_ok(str(entity[field]), LOOSE_DATE_RE):
             errors.append(f"{eid}: {field} must be YYYY[-MM[-DD]]")
-    if etype == "application" and "date" in entity \
-            and not _date_ok(str(entity.get("date")), FULL_DATE_RE):
-        errors.append(f"{eid}: application date must be YYYY-MM-DD")
+    if etype == "application" and "date" in entity:
+        raw_date = entity.get("date")
+        try:
+            if isinstance(raw_date, date):
+                date.fromisoformat(raw_date.isoformat())
+            elif isinstance(raw_date, str) and FULL_DATE_RE.fullmatch(raw_date):
+                date.fromisoformat(raw_date)
+            else:
+                raise ValueError
+        except ValueError:
+            errors.append(f"{eid}: application date must be a valid YYYY-MM-DD date")
     if etype == "skill" and entity.get("level") is not None \
             and entity["level"] not in LEVEL_VALUES:
         errors.append(f"{eid}: level must be one of {sorted(LEVEL_VALUES)}")
+    if etype == "publication":
+        for field in ("url", "code_url"):
+            value = entity.get(field)
+            if value is not None:
+                parsed = urlparse(value) if isinstance(value, str) else None
+                if not parsed or parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                    errors.append(f"{eid}: {field} must be an HTTP(S) URL")
     links = entity.get("links") or {}
     if not isinstance(links, dict):
         errors.append(f"{eid}: links must be a mapping")
@@ -140,6 +157,38 @@ def check_schema(entity: dict) -> list[str]:
         if listfield in entity and entity[listfield] is not None \
                 and not isinstance(entity[listfield], list):
             errors.append(f"{eid}: {listfield} must be a list")
+    if etype == "application":
+        variant = entity.get("resume_variant")
+        if variant is not None:
+            if not isinstance(variant, str) or not variant.startswith("outputs/resumes/") \
+                    or not variant.endswith(".pdf") or ".." in Path(variant).parts:
+                errors.append(f"{eid}: resume_variant must be a repo-relative outputs/resumes/*.pdf path")
+        contacts = entity.get("contacts")
+        if isinstance(contacts, list):
+            for index, contact in enumerate(contacts):
+                if not isinstance(contact, str) or not contact.strip():
+                    errors.append(f"{eid}: contacts[{index}] must be a non-empty string")
+        follow_ups = entity.get("follow_ups")
+        if isinstance(follow_ups, list):
+            for index, follow_up in enumerate(follow_ups):
+                label = f"{eid}: follow_ups[{index}]"
+                if not isinstance(follow_up, dict):
+                    errors.append(f"{label} must be a mapping")
+                    continue
+                raw_date = follow_up.get("date")
+                try:
+                    if isinstance(raw_date, date):
+                        date.fromisoformat(raw_date.isoformat())
+                    elif isinstance(raw_date, str) and FULL_DATE_RE.fullmatch(raw_date):
+                        date.fromisoformat(raw_date)
+                    else:
+                        raise ValueError
+                except ValueError:
+                    errors.append(f"{label}.date must be a valid YYYY-MM-DD date")
+                if not isinstance(follow_up.get("note"), str) or not follow_up["note"].strip():
+                    errors.append(f"{label}.note must be a non-empty string")
+                if not isinstance(follow_up.get("done"), bool):
+                    errors.append(f"{label}.done must be true or false")
     return errors
 
 

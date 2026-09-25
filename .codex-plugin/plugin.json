@@ -1,7 +1,7 @@
 {
   "name": "career-flow",
-  "version": "0.1.1",
-  "description": "Capture career experiences, projects, skills, publications, stories, and applications in a private git-backed knowledge base.",
+  "version": "0.2.1",
+  "description": "Capture private career knowledge and create general or tailored resumes, cover letters, interview prep, and outreach drafts.",
   "author": {
     "name": "Borna Barahimi",
     "url": "https://github.com/bornabr"
@@ -12,15 +12,17 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Career Flow",
-    "shortDescription": "Private, structured career knowledge",
-    "longDescription": "Build and maintain a private git-backed career knowledge base for resumes, applications, and interview preparation.",
+    "shortDescription": "Private career knowledge and outputs",
+    "longDescription": "Capture career evidence in a private git-backed knowledge base and use it for general or tailored resumes, application writing, interview preparation, and outreach drafts.",
     "developerName": "Borna Barahimi",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/bornabr/career-flow",
     "defaultPrompt": [
       "Set up my private career knowledge base.",
-      "Capture a new career accomplishment."
+      "Capture a new career accomplishment.",
+      "Tailor my resume to a job posting.",
+      "Prepare me for an interview."
     ]
   }
 }
