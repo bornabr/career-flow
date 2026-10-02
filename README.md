@@ -17,7 +17,8 @@ Clone this repository, then run the commands for your agent from the repository 
 
 Invoke skills as `/career-flow:bootstrap`, `/career-flow:capture`,
 `/career-flow:resume`, `/career-flow:cover-letter`,
-`/career-flow:interview-prep`, and `/career-flow:outreach`.
+`/career-flow:interview-prep`, `/career-flow:outreach`,
+`/career-flow:checkin`, and `/career-flow:maintain`.
 
 ### OpenAI Codex CLI
 
@@ -26,8 +27,9 @@ Invoke skills as `/career-flow:bootstrap`, `/career-flow:capture`,
 
 Start a new Codex session after installation. Invoke skills as
 `$career-flow:bootstrap`, `$career-flow:capture`, `$career-flow:resume`,
-`$career-flow:cover-letter`, `$career-flow:interview-prep`, and
-`$career-flow:outreach`, or describe the matching task and let Codex activate the
+`$career-flow:cover-letter`, `$career-flow:interview-prep`,
+`$career-flow:outreach`, `$career-flow:checkin`, and `$career-flow:maintain`,
+or describe the matching task and let Codex activate the
 skill automatically.
 
 ## First run
@@ -54,6 +56,31 @@ screening result.
 
 `scripts/due_followups.py <data-repo>` lists active applications with unfinished
 follow-ups due today. It does not change data or send messages.
+
+## Phase 3 maintenance
+
+`checkin` guides a periodic review of work since the last approved check-in and
+triages candidates in `data/inbox.md`. `maintain` reports stale facts, missing metrics,
+similar entries, broken links, and index drift before proposing any changes. Approved
+check-ins are dated files under `data/checkins/`. The read-only status helper is:
+
+    uv run scripts/phase3_status.py <data-repo> --json
+
+Passive capture is **off by default**. To opt in, set
+`capture.passive.enabled: true` in the private data repo and explicitly allowlist
+source repositories in `github_repos` and/or absolute directories in
+`session_projects`. The GitHub source scans merged PR titles, dates, and URLs only when
+you run `python3 scripts/passive_capture.py github <data-repo>`; the Claude Code
+`SessionEnd` hook scans only allowlisted workspaces and writes no transcript text.
+Both sources append review candidates to `data/inbox.md`, never career entities;
+`data/passive-state.json` stores deduplication checkpoints after an enabled scan.
+They do not publish output or commit on their own. GitHub scanning uses the
+authenticated `gh` CLI; the session hook uses only local transcript data. Keep
+passive capture disabled for confidential work unless you deliberately allowlist
+its source.
+
+Draft-only or test outreach no longer creates an application entity. An application
+log begins only when the user confirms an actual submission.
 
 ## Development
 

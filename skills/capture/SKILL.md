@@ -38,7 +38,9 @@ an unresolved placeholder and do not rely on a plugin path saved by another host
    - publication: title, venue, date, co-authors, your contribution, paper URL,
      and code repository URL if public; verify links before storing them
    - story: situation, task, action, result (metrics), which experience/project it belongs to
-   - application: company, role, date, posting summary, resume variant used, contacts
+   - application: only after actual submission; company, role, submitted date, posting
+     summary, resume variant actually used, contacts. For draft-only or test targets,
+     do not create an application entity.
 3. **Draft the entity.** Copy the matching template from
    `<plugin-root>/templates/entities/`, fill it in. Slug rules: lowercase,
    hyphens, short (`proj-career-flow`). Filename = id. Put the user's original words

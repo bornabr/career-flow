@@ -5,8 +5,11 @@ plugin:
 capture:
   checkin_interval_days: 14
   passive:
-    enabled: false                     # Phase 3 feature; keep false
-    sources: [github, claude_sessions]
+    enabled: false                     # default off; opt in explicitly
+    sources: [github, claude_sessions]  # use inline list syntax for passive settings
+    github_repos: []                    # explicit owner/repo allowlist before enabling GitHub scan
+    session_projects: []                # explicit absolute-path allowlist for Claude session hook
+    github_lookback_days: 14
 
 memory:
   staleness_months: 6                  # maintain flow flags entries older than this

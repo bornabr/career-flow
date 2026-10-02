@@ -5,7 +5,7 @@ title: ROLE @ COMPANY
 summary: ONE-LINE HOOK FOR INDEX
 company: COMPANY
 role: ROLE
-date: YYYY-MM-DD
+date: YYYY-MM-DD  # actual application submission date, not a draft/tracking date
 # Add resume_variant only after this PDF is actually used for this application.
 # resume_variant: outputs/resumes/COMPANY-ROLE-DATE/resume.pdf
 # contacts: ["Jane Doe — recruiter — linkedin.com/in/..."]

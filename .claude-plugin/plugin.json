@@ -1,7 +1,7 @@
 {
   "name": "career-flow",
-  "version": "0.2.1",
-  "description": "Private career knowledge plugin with capture, general or tailored resumes, cover letters, interview prep, and outreach drafts.",
+  "version": "0.3.0",
+  "description": "Private career knowledge plugin with capture, application outputs, check-ins, maintenance, and opt-in passive candidate capture.",
   "author": { "name": "Borna Barahimi" },
   "repository": "https://github.com/bornabr/career-flow"
 }

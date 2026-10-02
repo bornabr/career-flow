@@ -57,7 +57,7 @@ def parse_frontmatter(text: str) -> tuple[dict | None, str | None]:
         return None, "unterminated frontmatter"
     try:
         fm = yaml.safe_load(text[4:end])
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, ValueError) as exc:
         return None, f"invalid YAML in frontmatter: {exc}"
     if not isinstance(fm, dict):
         return None, "frontmatter is not a mapping"
@@ -66,6 +66,16 @@ def parse_frontmatter(text: str) -> tuple[dict | None, str | None]:
 
 def _date_ok(value, pattern) -> bool:
     return isinstance(value, str) and bool(pattern.match(value))
+
+
+def _full_date_ok(value) -> bool:
+    if not _date_ok(str(value), FULL_DATE_RE):
+        return False
+    try:
+        date.fromisoformat(str(value))
+    except ValueError:
+        return False
+    return True
 
 
 def check_body(text: str, eid: str) -> list[str]:
@@ -110,8 +120,8 @@ def check_schema(entity: dict) -> list[str]:
         errors.append(f"{eid}: status must be one of {sorted(STATUS_VALUES)}")
     if "visibility" in entity and entity["visibility"] not in VISIBILITY_VALUES:
         errors.append(f"{eid}: visibility must be one of {sorted(VISIBILITY_VALUES)}")
-    if "last_verified" in entity and not _date_ok(str(entity.get("last_verified")), FULL_DATE_RE):
-        errors.append(f"{eid}: last_verified must be YYYY-MM-DD")
+    if "last_verified" in entity and not _full_date_ok(entity.get("last_verified")):
+        errors.append(f"{eid}: last_verified must be a valid YYYY-MM-DD date")
     for field in ("start", "end", "date"):
         if field in entity and entity[field] is not None \
                 and not _date_ok(str(entity[field]), LOOSE_DATE_RE):

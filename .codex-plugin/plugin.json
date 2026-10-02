@@ -1,7 +1,7 @@
 {
   "name": "career-flow",
-  "version": "0.2.1",
-  "description": "Capture private career knowledge and create general or tailored resumes, cover letters, interview prep, and outreach drafts.",
+  "version": "0.3.0",
+  "description": "Capture private career knowledge, create application outputs, and maintain it with check-ins and opt-in passive candidate capture.",
   "author": {
     "name": "Borna Barahimi",
     "url": "https://github.com/bornabr"
@@ -12,8 +12,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Career Flow",
-    "shortDescription": "Private career knowledge and outputs",
-    "longDescription": "Capture career evidence in a private git-backed knowledge base and use it for general or tailored resumes, application writing, interview preparation, and outreach drafts.",
+    "shortDescription": "Private career knowledge and maintenance",
+    "longDescription": "Capture career evidence in a private git-backed knowledge base; use it for application outputs and keep it current through check-ins, maintenance, and opt-in candidate capture.",
     "developerName": "Borna Barahimi",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],

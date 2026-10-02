@@ -22,9 +22,12 @@ never mark a follow-up done without the user's confirmation.
 
 ## Drafting flow
 
-1. Identify the target application, company, role, and outreach purpose. If no
-   application exists, create one from the application template using only known
-   facts and the user's original notes. Keep `visibility: private`.
+1. Identify the target company, role, and outreach purpose. Check whether the user
+   actually applied. For draft-only, exploratory, or test work, do **not** create an
+   application entity or set an application date; use a provisional output slug and
+   label all drafts unsent. If an application was submitted and no entity exists,
+   create one from the application template using only confirmed facts and original
+   notes. Keep `visibility: private`.
 2. Use contacts supplied by the user or research public, work-related sources for
    likely hiring managers or recruiters. Record a name/title/profile URL and access
    date only when verifiable. Label a merely possible contact as tentative. Do not
@@ -32,11 +35,13 @@ never mark a follow-up done without the user's confirmation.
 3. Draft a short LinkedIn note or email with a concrete, source-backed reason for
    reaching out and a low-pressure ask. Save drafts under
    `outputs/outreach/<company>-<role>-<YYYY-MM-DD>/` with a `sources.md` file
-   recording the application id, career entity ids, and contact-source URLs/dates.
+   recording the application id **if one exists**, career entity ids, and
+   contact-source URLs/dates.
    These are drafts only: never send, connect, or post on the user's behalf.
-4. Ask the user to approve any contacts to retain and follow-up dates. Add strings
-   to `contacts` and `{date: YYYY-MM-DD, note: ..., done: false}` items to
-   `follow_ups` in the application entity. Preserve existing raw notes. If the user
+4. Ask the user to approve any contacts to retain and follow-up dates. Only for a
+   confirmed application, add strings to `contacts` and
+   `{date: YYYY-MM-DD, note: ..., done: false}` items to `follow_ups` in the
+   application entity. Preserve existing raw notes. If the user
    says a message was sent or a follow-up was completed, record only that confirmed
    status; do not infer it from a draft.
 5. Run `<plugin-root>/scripts/validate.py <data-repo>`, resolve errors, review the

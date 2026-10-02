@@ -45,6 +45,14 @@ available, stop and ask the user to install or enable the plugin.
 Staging area for automatically noticed accomplishment candidates. Never promote inbox
 items to entities without the user confirming; delete rejected items.
 
+## Check-ins and maintenance
+
+Use the installed `checkin` skill for periodic guided review and `maintain` for
+staleness, metrics, duplicate, and link audits. Approved check-ins are logged under
+`data/checkins/YYYY-MM-DD.md`. Passive capture is disabled by default, requires
+explicit source allowlists in `config.yaml`, and may add only review candidates to
+`data/inbox.md`; it must not create entities or publish details automatically.
+
 ## Generated outputs
 
 Use the installed career-flow `resume`, `cover-letter`, `interview-prep`, and
